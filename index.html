@@ -79,11 +79,21 @@
             <h1 class="text-xl md:text-3xl font-bold text-slate-800 leading-tight">📊 สถิติยอดรับชมรายงานคะแนนเลือกตั้งผู้ว่า กทม.69</h1>
             <p class="text-slate-500 text-[13px] md:text-base mt-1">เปรียบเทียบยอดรับชมผ่านหน้าจอ TV และ ออนไลน์</p>
         </div>
-        <div class="w-full md:w-auto text-left md:text-right flex-shrink-0">
-            <span class="text-[11px] md:text-xs font-semibold text-slate-400 block uppercase mb-1">เลือกช่วงเวลาแสดงผล</span>
-            <select id="timeFilter" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm md:text-base rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 font-medium cursor-pointer transition-all" disabled>
-                <option value="">กำลังเชื่อมต่อข้อมูล...</option>
-            </select>
+        <div class="w-full md:w-auto flex flex-col sm:flex-row gap-3">
+            <div class="flex-1 text-left">
+                <span class="text-[11px] md:text-xs font-semibold text-slate-400 block uppercase mb-1">เลือกช่วงเวลาแสดงผล</span>
+                <select id="timeFilter" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm md:text-base rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 font-medium cursor-pointer transition-all" disabled>
+                    <option value="">กำลังเชื่อมต่อข้อมูล...</option>
+                </select>
+            </div>
+            <div class="flex-1 text-left relative">
+                <span class="text-[11px] md:text-xs font-semibold text-slate-400 block uppercase mb-1">เลือกสื่อ/ช่อง (เลือกได้หลายช่อง)</span>
+                <button type="button" id="channelDropdownBtn" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm md:text-base rounded-lg block w-full p-2.5 font-medium cursor-pointer transition-all text-left flex items-center justify-between gap-2" disabled>
+                    <span id="channelDropdownLabel" class="truncate">📡 ทุกสื่อ/ช่อง</span>
+                    <span class="text-slate-400 text-xs">▾</span>
+                </button>
+                <div id="channelDropdownPanel" class="hidden absolute z-30 mt-1 right-0 w-full md:w-64 bg-white border border-slate-200 rounded-lg shadow-xl max-h-72 overflow-y-auto custom-scrollbar p-1"></div>
+            </div>
         </div>
     </header>
 
@@ -136,6 +146,13 @@
                     </tbody>
                 </table>
             </div>
+            <!-- ปุ่มดูเพิ่มเติม : เฉพาะหน้าสรุปทุกช่วงเวลา -->
+            <div id="viewMoreWrap" class="mt-4 hidden">
+                <button id="viewMoreBtn" class="w-full md:w-auto px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 mx-auto">
+                    <span id="viewMoreLabel">📋 ดูเพิ่มเติม : ข้อมูลรายช่วงเวลา (ทั้งหมด)</span>
+                </button>
+                <div id="allTimesBreakdown" class="mt-5 space-y-6 hidden"></div>
+            </div>
         </div>
 
         <div class="col-span-1 lg:col-span-8 card">
@@ -171,6 +188,7 @@
     let platformChart = null;
     let trendChart = null;
     let platformTrendChart = null;
+    let selectedChannels = [];
 
 
     // การตั้งค่าช่องที่ทำ Cross Live (ถ้ายอด FB เท่ากัน จะถือว่าเป็นยอดเดียวกันเพื่อไม่ให้นับซ้ำ)
@@ -347,6 +365,18 @@
         
         // บังคับให้โหลดหน้าแรกมา เป็นโหมด "ดูทั้งหมด (all)" เสมอ
         timeFilter.value = 'all';
+
+        // ===== เติมรายการช่อง/สื่อ ในดรอปดาวน์แบบเลือกได้หลายช่อง (checkbox) =====
+        const chPanel = document.getElementById('channelDropdownPanel');
+        const channelList = [...new Set(allData.map(d => d.publisher))].sort((a, b) => a.localeCompare(b, 'th'));
+        let chHTML = '<label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-100 cursor-pointer text-sm font-semibold text-indigo-700"><input type="checkbox" id="chkAllChannels" class="accent-indigo-600" checked> 📡 ทุกสื่อ/ช่อง (ดูทั้งหมด)</label><div class="border-t border-slate-100 my-1"></div>';
+        channelList.forEach(pub => { chHTML += '<label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-100 cursor-pointer text-sm text-slate-700"><input type="checkbox" class="channel-chk accent-indigo-600" value="' + pub + '"> 📺 ' + pub + '</label>'; });
+        chPanel.innerHTML = chHTML;
+        document.getElementById('channelDropdownBtn').disabled = false;
+        selectedChannels = [];
+        bindChannelDropdown();
+        updateChannelLabel();
+
         updateDashboard('all');
     }
 
@@ -361,8 +391,96 @@
         return `<td class="py-2.5 px-2 text-center text-slate-700 border-r border-slate-200 ${bgClass}">${val.toLocaleString()}</td>`;
     }
 
+    // ===== Helper ระดับ global สำหรับสร้างเซลล์ (ใช้ทั้งตารางหลักและตารางรายช่วงเวลา) =====
+    function gPublisherCell(pub) {
+        return `<td class="py-2 px-3 flex items-center gap-2 sticky left-0 z-10 bg-white group-hover:bg-slate-100 transition-colors border-r border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">${getLogoHTML(pub)}<span class="font-semibold text-slate-700 truncate w-full pr-1 text-[12px] md:text-sm">${pub}</span></td>`;
+    }
+    function gTotalCell(val, maxVal) {
+        if (val === 0) return `<td class="py-2.5 px-3 text-center text-slate-300 bg-slate-50/50 border-l border-slate-300">-</td>`;
+        if (val === maxVal && val > 0) return `<td class="py-2.5 px-3 text-center bg-slate-50/50 border-l border-slate-300"><span class="text-red-600 font-extrabold text-[14px] md:text-base whitespace-nowrap">👑 ${val.toLocaleString()}</span></td>`;
+        return `<td class="py-2.5 px-3 text-center font-bold text-indigo-700 bg-slate-50/50 border-l border-slate-300">${val.toLocaleString()}</td>`;
+    }
+
+    // สร้างบล็อกตารางของแต่ละช่วงเวลา (ใช้กับปุ่ม "ดูเพิ่มเติม")
+    function buildTimeBlock(time) {
+        const rows = allData.filter(d => d.time === time && channelMatch(d.publisher)).map(d => ({...d, tv: {...d.tv}, online: {...d.online}}));
+        if (!rows.length) return '';
+        const tvRows = rows.filter(d => (d.tv.yt + d.tv.fb + d.tv.tk + d.tv.x) > 0);
+        const onRows = rows.filter(d => (d.online.yt + d.online.fb + d.online.tk + d.online.x) > 0);
+        const mx = (arr, fn) => arr.length ? Math.max(...arr.map(fn)) : 0;
+        const tvT = d => d.tv.yt + d.tv.fb + d.tv.tk + d.tv.x;
+        const onT = d => d.online.yt + d.online.fb + d.online.tk + d.online.x;
+        let body = '';
+        if (tvRows.length) {
+            const a = mx(tvRows, d => d.tv.yt), b = mx(tvRows, d => d.tv.fb), c = mx(tvRows, d => d.tv.tk), e = mx(tvRows, d => d.tv.x), t = mx(tvRows, tvT);
+            body += `<tr><td colspan="6" class="py-2 px-3 font-bold text-slate-700 bg-blue-50 border-y border-slate-300 text-[12px]">📺 หน้าจอ TV</td></tr>`;
+            tvRows.forEach(r => { body += `<tr class="group hover:bg-slate-100 transition-colors">` + gPublisherCell(r.publisher) + getCellHTML(r.tv.yt, a, 'bg-blue-50/20') + getCellHTML(r.tv.fb, b, 'bg-blue-50/20') + getCellHTML(r.tv.tk, c, 'bg-blue-50/20') + getCellHTML(r.tv.x, e, 'bg-blue-50/20 border-r-slate-300') + gTotalCell(tvT(r), t) + `</tr>`; });
+        }
+        if (onRows.length) {
+            const a = mx(onRows, d => d.online.yt), b = mx(onRows, d => d.online.fb), c = mx(onRows, d => d.online.tk), e = mx(onRows, d => d.online.x), t = mx(onRows, onT);
+            body += `<tr><td colspan="6" class="py-2 px-3 font-bold text-slate-700 bg-emerald-50 border-y border-slate-300 text-[12px]">🌐 รายการพิเศษทางออนไลน์</td></tr>`;
+            onRows.forEach(r => { body += `<tr class="group hover:bg-slate-100 transition-colors">` + gPublisherCell(r.publisher) + getCellHTML(r.online.yt, a, 'bg-emerald-50/20') + getCellHTML(r.online.fb, b, 'bg-emerald-50/20') + getCellHTML(r.online.tk, c, 'bg-emerald-50/20') + getCellHTML(r.online.x, e, 'bg-emerald-50/20 border-r-slate-300') + gTotalCell(onT(r), t) + `</tr>`; });
+        }
+        const head = `<thead><tr class="bg-slate-100 text-slate-600 border-b-2 border-slate-300"><th class="py-2 px-3 text-left font-bold text-slate-700 sticky left-0 z-10 bg-slate-100 border-r border-slate-300">สื่อ/ช่อง</th><th class="py-2 px-1.5 text-center border-r border-slate-200 text-red-600 font-bold">YouTube</th><th class="py-2 px-1.5 text-center border-r border-slate-200 text-blue-600 font-bold">Facebook</th><th class="py-2 px-1.5 text-center border-r border-slate-200 text-black font-bold">TikTok</th><th class="py-2 px-1.5 text-center border-r border-slate-300 text-slate-800 font-bold">X</th><th class="py-2 px-3 text-center font-bold text-indigo-700 border-l border-slate-300">ยอดชมรวม</th></tr></thead>`;
+        return `<div class="rounded-lg border border-slate-200 shadow-sm overflow-hidden"><div class="bg-indigo-50 px-3 py-2 font-bold text-indigo-700 text-sm">🕒 เวลา ${time} น.</div><div class="overflow-x-auto custom-scrollbar"><table class="w-full text-left border-collapse min-w-[480px] text-[12px] md:text-[13px]">${head}<tbody class="divide-y divide-slate-100">${body}</tbody></table></div></div>`;
+    }
+
+    function renderAllTimesBreakdown() {
+        const cont = document.getElementById('allTimesBreakdown');
+        if (!cont) return;
+        const sortedTimes = Array.from(timeSet).sort();
+        const html = sortedTimes.map(buildTimeBlock).filter(Boolean).join('');
+        cont.innerHTML = html || '<div class="text-center text-slate-400 py-6">ไม่มีข้อมูลสำหรับช่องที่เลือก</div>';
+    }
+
+    function refreshAll() {
+        const t = document.getElementById('timeFilter').value || 'all';
+        updateTrendChart();
+        updatePlatformTrendChart();
+        updateDashboard(t);
+    }
+
+    // ===== ดรอปดาวน์เลือกสื่อ/ช่องแบบหลายช่อง (checkbox) =====
+    let _channelBound = false;
+    function bindChannelDropdown() {
+        const btn = document.getElementById('channelDropdownBtn');
+        const panel = document.getElementById('channelDropdownPanel');
+        if (!btn || !panel) return;
+        if (!_channelBound) {
+            btn.addEventListener('click', function(e) { e.stopPropagation(); panel.classList.toggle('hidden'); });
+            document.addEventListener('click', function(e) { if (!panel.contains(e.target) && e.target !== btn && !btn.contains(e.target)) panel.classList.add('hidden'); });
+            _channelBound = true;
+        }
+        const allChk = document.getElementById('chkAllChannels');
+        const chks = Array.from(panel.querySelectorAll('.channel-chk'));
+        allChk.addEventListener('change', function() {
+            if (allChk.checked) { chks.forEach(c => c.checked = false); }
+            else if (!chks.some(c => c.checked)) { allChk.checked = true; }
+            applyChannelSelection();
+        });
+        chks.forEach(c => c.addEventListener('change', function() {
+            if (chks.some(x => x.checked)) allChk.checked = false; else allChk.checked = true;
+            applyChannelSelection();
+        }));
+    }
+    function applyChannelSelection() {
+        const panel = document.getElementById('channelDropdownPanel');
+        const chks = Array.from(panel.querySelectorAll('.channel-chk'));
+        selectedChannels = chks.filter(c => c.checked).map(c => c.value);
+        updateChannelLabel();
+        refreshAll();
+    }
+    function updateChannelLabel() {
+        const el = document.getElementById('channelDropdownLabel');
+        if (!el) return;
+        const n = selectedChannels.length;
+        if (n === 0) el.textContent = '📡 ทุกสื่อ/ช่อง';
+        else if (n === 1) el.textContent = '📺 ' + selectedChannels[0];
+        else el.textContent = '📺 เลือก ' + n + ' ช่อง (เปรียบเทียบ)';
+    }
+
     function calculatePlatformTotals(timeTarget) {
-        let dataAtTime = allData.filter(d => d.time === timeTarget).map(d => ({...d}));
+        let dataAtTime = allData.filter(d => d.time === timeTarget && channelMatch(d.publisher)).map(d => ({...d}));
         
         dataAtTime.forEach(r => { r.skipFb = false; });
         for (let i = 0; i < dataAtTime.length; i++) {
@@ -402,9 +520,18 @@
         return (name || '').toUpperCase().includes('THAI PBS');
     }
 
+    // ช่องที่เลือก (รองรับหลายช่อง). ว่าง = ทุกช่อง
+    function channelMatch(pub) {
+        return selectedChannels.length === 0 || selectedChannels.includes(pub);
+    }
+    // ช่องที่โฟกัสใน Insights: ไม่เลือก = ตระกูล Thai PBS, เลือก 1+ ช่อง = เฉพาะช่องเหล่านั้น
+    function isFocusChannel(name) {
+        return selectedChannels.length === 0 ? isThaiPBS(name) : selectedChannels.includes(name);
+    }
+
     // รวมยอดทุกช่องตระกูล Thai PBS ณ เวลาหนึ่ง (หักลบ Cross Live ภายในตระกูล)
     function calculateThaiPBSTotals(timeTarget) {
-        let rows = allData.filter(d => d.time === timeTarget && isThaiPBS(d.publisher)).map(d => ({...d}));
+        let rows = allData.filter(d => d.time === timeTarget && isFocusChannel(d.publisher)).map(d => ({...d}));
         rows.forEach(r => { r.skipFb = false; });
         for (let i = 0; i < rows.length; i++) {
             if (rows[i].skipFb) continue;
@@ -425,13 +552,14 @@
 
     // จัดอันดับ "เอนทิตี" ณ เวลาหนึ่ง โดยรวมช่องตระกูล Thai PBS เป็นรายเดียว
     function getEntityRankAtTime(timeTarget) {
+        const focusName = selectedChannels.length === 0 ? 'Thai PBS (ทุกช่อง)' : (selectedChannels.length === 1 ? selectedChannels[0] : 'ช่องที่เลือก (รวม)');
         const map = {};
-        const pbsNet = calculateThaiPBSTotals(timeTarget).net;
-        if (pbsNet > 0) map['Thai PBS (ทุกช่อง)'] = pbsNet;
-        allData.filter(d => d.time === timeTarget && !isThaiPBS(d.publisher)).forEach(r => {
+        const fNet = calculateThaiPBSTotals(timeTarget).net;
+        if (fNet > 0) map[focusName] = fNet;
+        allData.filter(d => d.time === timeTarget && !isFocusChannel(d.publisher)).forEach(r => {
             map[r.publisher] = (map[r.publisher] || 0) + r.total;
         });
-        return Object.entries(map).map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total);
+        return Object.entries(map).map(([name, total]) => ({ name, total, isFocus: name === focusName })).sort((a, b) => b.total - a.total);
     }
 
     // ฟังก์ชันสร้างรายงานโดยยึด Thai PBS เป็นหลัก + เทียบคู่แข่ง
@@ -466,11 +594,14 @@
         // เทียบคู่แข่ง ณ เวลาพีคของ Thai PBS
         const ranking = getEntityRankAtTime(pbsPeakTime);
         const grandAtPeak = ranking.reduce((s, r) => s + r.total, 0);
-        const pbsRank = ranking.findIndex(r => r.name.indexOf('Thai PBS') === 0) + 1;
+        const _nSel = selectedChannels.length;
+        const focusLabel = _nSel === 0 ? 'Thai PBS' : (_nSel === 1 ? selectedChannels[0] : 'ช่องที่เลือก');
+        const focusLong = _nSel === 0 ? 'กลุ่มช่อง Thai PBS' : (_nSel === 1 ? ('ช่อง ' + selectedChannels[0]) : ('กลุ่ม ' + _nSel + ' ช่องที่เลือก'));
+        const pbsRank = ranking.findIndex(r => r.isFocus) + 1;
         const pbsShare = grandAtPeak > 0 ? ((pbsPeak / grandAtPeak) * 100).toFixed(1) : 0;
         const leader = ranking[0] || { name: "-", total: 0 };
-        const isPbsLeader = leader.name.indexOf('Thai PBS') === 0;
-        const topCompetitor = ranking.find(r => r.name.indexOf('Thai PBS') !== 0) || { name: "-", total: 0 };
+        const isPbsLeader = !!(leader && leader.isFocus);
+        const topCompetitor = ranking.find(r => !r.isFocus) || { name: "-", total: 0 };
         const gapMultiple = topCompetitor.total > 0 ? (pbsPeak / topCompetitor.total).toFixed(2) : '-';
         const behindPct = leader.total > 0 ? (((leader.total - pbsPeak) / leader.total) * 100).toFixed(1) : 0;
 
@@ -479,11 +610,11 @@
                 <div class="border-b border-indigo-800 pb-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
                     <div>
                         <h3 class="text-lg md:text-xl font-bold text-yellow-300 flex items-center gap-2">
-                            <span>📊</span> บทวิเคราะห์ภาพรวมเชิงสถิติ : กรณีศึกษา Thai PBS
+                            <span>📊</span> บทวิเคราะห์ภาพรวมเชิงสถิติ : กรณีศึกษา ${focusLabel}
                         </h3>
-                        <p class="text-[11px] md:text-xs text-indigo-200 mt-1">วิเคราะห์ยอดรับชมโดยใช้กลุ่มช่อง Thai PBS เป็นหน่วยอ้างอิงหลัก (benchmark) เทียบกับคู่แข่งในตลาด</p>
+                        <p class="text-[11px] md:text-xs text-indigo-200 mt-1">วิเคราะห์ยอดรับชมโดยใช้${focusLong}เป็นหน่วยอ้างอิงหลัก (benchmark) เทียบกับคู่แข่งในตลาด</p>
                     </div>
-                    <span class="bg-yellow-400 text-slate-950 text-[10px] md:text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Thai PBS Focus</span>
+                    <span class="bg-yellow-400 text-slate-950 text-[10px] md:text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">${focusLabel} Focus</span>
                 </div>
 
                 <!-- การ์ดตัวเลขสรุปผล (ยึด Thai PBS) -->
@@ -501,7 +632,7 @@
                     <div class="bg-indigo-950/60 p-3.5 rounded-lg border border-indigo-800">
                         <span class="text-[10px] md:text-[11px] text-indigo-300 uppercase tracking-wider block font-semibold">แพลตฟอร์มหลัก (Dominant Channel)</span>
                         <span class="text-xl md:text-2xl font-extrabold text-white block mt-1 truncate">${pbsDominant.name}</span>
-                        <span class="text-[10px] md:text-[11px] text-indigo-200 block mt-1">ครองสัดส่วน ${pbsDomPct}% ของยอด Thai PBS</span>
+                        <span class="text-[10px] md:text-[11px] text-indigo-200 block mt-1">ครองสัดส่วน ${pbsDomPct}% ของยอด ${focusLabel}</span>
                     </div>
                     <div class="bg-indigo-950/60 p-3.5 rounded-lg border border-indigo-800">
                         <span class="text-[10px] md:text-[11px] text-indigo-300 uppercase tracking-wider block font-semibold">โครงสร้างการรับชม (TV / Online)</span>
@@ -517,7 +648,7 @@
                             <span>🏆</span> 1. ตำแหน่งเชิงการแข่งขัน (Market Position)
                         </h4>
                         <p class="text-[11px] md:text-xs text-indigo-150 leading-relaxed">
-                            ณ ช่วงพีค (${pbsPeakTime} น.) ยอดรับชมรวมของกลุ่มช่อง Thai PBS อยู่ที่ <b>${pbsPeak.toLocaleString()}</b> วิว ${isPbsLeader ? `จัดอยู่ใน <b class="text-yellow-300">อันดับ 1</b> ของตลาด` : `จัดอยู่ใน <b>อันดับที่ ${pbsRank}</b>`} คิดเป็นส่วนแบ่งการรับชม (viewership share) ราว <b>${pbsShare}%</b> ของทั้งอุตสาหกรรมในช่วงเวลาดังกล่าว
+                            ณ ช่วงพีค (${pbsPeakTime} น.) ยอดรับชมรวมของ${focusLong}อยู่ที่ <b>${pbsPeak.toLocaleString()}</b> วิว ${isPbsLeader ? `จัดอยู่ใน <b class="text-yellow-300">อันดับ 1</b> ของตลาด` : `จัดอยู่ใน <b>อันดับที่ ${pbsRank}</b>`} คิดเป็นส่วนแบ่งการรับชม (viewership share) ราว <b>${pbsShare}%</b> ของทั้งอุตสาหกรรมในช่วงเวลาดังกล่าว
                         </p>
                     </div>
 
@@ -527,8 +658,8 @@
                         </h4>
                         <p class="text-[11px] md:text-xs text-indigo-150 leading-relaxed">
                             ${isPbsLeader
-                                ? `Thai PBS ครองตำแหน่งผู้นำ โดยมียอดรับชมสูงกว่าคู่แข่งอันดับรองอย่าง <b>${topCompetitor.name}</b> (${topCompetitor.total.toLocaleString()} วิว) คิดเป็นอัตราส่วนราว <b class="text-green-400">${gapMultiple} เท่า</b>`
-                                : `ผู้นำตลาดในช่วงเวลานี้คือ <b>${leader.name}</b> (${leader.total.toLocaleString()} วิว) ขณะที่ Thai PBS มียอดต่ำกว่าผู้นำราว <b>${behindPct}%</b> ซึ่งเป็นช่องว่างที่สะท้อนศักยภาพในการเติบโต`}
+                                ? `${focusLabel} ครองตำแหน่งผู้นำ โดยมียอดรับชมสูงกว่าคู่แข่งอันดับรองอย่าง <b>${topCompetitor.name}</b> (${topCompetitor.total.toLocaleString()} วิว) คิดเป็นอัตราส่วนราว <b class="text-green-400">${gapMultiple} เท่า</b>`
+                                : `ผู้นำตลาดในช่วงเวลานี้คือ <b>${leader.name}</b> (${leader.total.toLocaleString()} วิว) ขณะที่ ${focusLabel} มียอดต่ำกว่าผู้นำราว <b>${behindPct}%</b> ซึ่งเป็นช่องว่างที่สะท้อนศักยภาพในการเติบโต`}
                         </p>
                     </div>
 
@@ -537,7 +668,7 @@
                             <span>📱</span> 3. การกระจายตัวตามแพลตฟอร์ม (Platform Mix)
                         </h4>
                         <p class="text-[11px] md:text-xs text-indigo-150 leading-relaxed">
-                            ฐานผู้ชม Thai PBS กระจุกตัวบน <b>${pbsDominant.name}</b> เป็นหลักที่สัดส่วน ${pbsDomPct}% รองลงมาคือ ${pbsPlatforms[1].name} เมื่อจำแนกตามช่องทางพบว่าเป็นการรับชมผ่านหน้าจอ TV ${pbsPctTV}% และผ่านออนไลน์ ${pbsPctOnline}% บ่งชี้พฤติกรรมการรับชมที่โน้มเอียงไปทาง${Number(pbsPctOnline) >= Number(pbsPctTV) ? 'แพลตฟอร์มออนไลน์' : 'หน้าจอโทรทัศน์'}
+                            ฐานผู้ชม ${focusLabel} กระจุกตัวบน <b>${pbsDominant.name}</b> เป็นหลักที่สัดส่วน ${pbsDomPct}% รองลงมาคือ ${pbsPlatforms[1].name} เมื่อจำแนกตามช่องทางพบว่าเป็นการรับชมผ่านหน้าจอ TV ${pbsPctTV}% และผ่านออนไลน์ ${pbsPctOnline}% บ่งชี้พฤติกรรมการรับชมที่โน้มเอียงไปทาง${Number(pbsPctOnline) >= Number(pbsPctTV) ? 'แพลตฟอร์มออนไลน์' : 'หน้าจอโทรทัศน์'}
                         </p>
                     </div>
                 </div>
@@ -555,7 +686,7 @@
             totalColHeader.innerHTML = "Peak สูงสุดรวม";
             
             const pubMap = {};
-            allData.forEach(row => {
+            allData.filter(d => channelMatch(d.publisher)).forEach(row => {
                 const pub = row.publisher;
                 if (!pubMap[pub]) {
                     pubMap[pub] = {
@@ -587,7 +718,7 @@
         } else {
             tableTitle.innerHTML = `ตารางสถิติแยกตามสื่อและแพลตฟอร์ม ณ เวลา ${selectedTime} น.`;
             totalColHeader.innerHTML = "ยอดชมรวม";
-            filteredData = allData.filter(d => d.time === selectedTime).map(d => ({
+            filteredData = allData.filter(d => d.time === selectedTime && channelMatch(d.publisher)).map(d => ({
                 ...d, 
                 tv: {...d.tv}, 
                 online: {...d.online}
@@ -739,6 +870,21 @@
         } else {
             updatePlatformChart([totalYT, totalFB, totalTK, totalX]);
         }
+
+        // ===== ปุ่มดูเพิ่มเติม: แสดงเฉพาะหน้าสรุปทุกช่วงเวลา =====
+        const vmWrap = document.getElementById('viewMoreWrap');
+        const bd = document.getElementById('allTimesBreakdown');
+        const vmLabel = document.getElementById('viewMoreLabel');
+        if (vmWrap) {
+            if (selectedTime === 'all') {
+                vmWrap.classList.remove('hidden');
+                if (bd && !bd.classList.contains('hidden')) renderAllTimesBreakdown();
+            } else {
+                vmWrap.classList.add('hidden');
+                if (bd) bd.classList.add('hidden');
+                if (vmLabel) vmLabel.textContent = '📋 ดูเพิ่มเติม : ข้อมูลรายช่วงเวลา (ทั้งหมด)';
+            }
+        }
     }
 
     function updatePlatformChart(dataValues) {
@@ -803,7 +949,7 @@
     function updateTrendChart() {
         const ctx = document.getElementById('trendChart').getContext('2d');
         const sortedTimes = Array.from(timeSet).sort();
-        const publishers = [...new Set(allData.map(d => d.publisher))];
+        const publishers = (selectedChannels.length === 0) ? [...new Set(allData.map(d => d.publisher))] : selectedChannels.filter(c => allData.some(d => d.publisher === c));
         const lineColors = ['#f26522', '#00a651', '#00a0e3', '#000000', '#d12027', '#8b5cf6', '#ec4899', '#64748b'];
 
         const datasets = publishers.map((pub, idx) => {
@@ -863,7 +1009,19 @@
         });
     }
 
-    document.getElementById('timeFilter').addEventListener('change', (e) => updateDashboard(e.target.value));
+    document.getElementById('timeFilter').addEventListener('change', refreshAll);
+    document.getElementById('viewMoreBtn').addEventListener('click', function() {
+        const bd = document.getElementById('allTimesBreakdown');
+        const label = document.getElementById('viewMoreLabel');
+        if (bd.classList.contains('hidden')) {
+            renderAllTimesBreakdown();
+            bd.classList.remove('hidden');
+            label.textContent = '🔼 ซ่อนข้อมูลรายช่วงเวลา';
+        } else {
+            bd.classList.add('hidden');
+            label.textContent = '📋 ดูเพิ่มเติม : ข้อมูลรายช่วงเวลา (ทั้งหมด)';
+        }
+    });
     window.addEventListener('resize', () => {
         if(platformChart) updatePlatformChart(platformChart.data.datasets[0].data);
         if(trendChart) updateTrendChart();
