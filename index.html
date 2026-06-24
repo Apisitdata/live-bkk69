@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สถิติยอดรับชมรายงานคะแนนเลือกตั้งผู้ว่า กทม.69 - Executive Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Niramit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Niramit', sans-serif; 
+            background-color: #f8fafc; 
+            margin: 0;
+            padding: 0;
+            color: #1e293b;
+            -webkit-tap-highlight-color: transparent; 
+        }
+        
+        .slide-container {
+            width: 100%;
+            max-width: 1360px;
+            margin: 0 auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        @media (min-width: 768px) {
+            .slide-container { padding: 20px; gap: 20px; }
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 16px;
+            border: 1px solid #e2e8f0;
+        }
+        @media (min-width: 768px) {
+            .card { padding: 20px; }
+        }
+
+        .logo-img { 
+            width: 32px; 
+            height: 32px; 
+            border-radius: 50%; 
+            object-fit: contain; 
+            border: 1px solid #e2e8f0; 
+            background-color: #ffffff;
+            padding: 3px;
+        }
+        .logo-placeholder { 
+            width: 32px; height: 32px; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center; 
+            font-weight: bold; color: white; font-size: 9px;
+            background-color: #64748b;
+        }
+        @media (min-width: 768px) {
+            .logo-img, .logo-placeholder { width: 34px; height: 34px; font-size: 10px; padding: 4px; }
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="slide-container">
+    <!-- Cover Image -->
+    <div class="w-full overflow-hidden rounded-xl shadow-md border border-slate-200 bg-white p-1.5 md:p-2">
+        <img src="https://www.thaipbs.or.th/images/general-images/89i95Nn0H.jpg/original/image.jpg" alt="Election 69 Cover" class="w-full h-auto rounded-lg md:rounded-xl object-cover max-h-[140px] md:max-h-[280px]">
+    </div>
+
+    <!-- Header & Filter -->
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-5 rounded-xl shadow-sm border-l-[6px] md:border-l-8 border-indigo-600 gap-4">
+        <div>
+            <h1 class="text-xl md:text-3xl font-bold text-slate-800 leading-tight">📊 สถิติยอดรับชมรายงานคะแนนเลือกตั้งผู้ว่า กทม.69</h1>
+            <p class="text-slate-500 text-[13px] md:text-base mt-1">เปรียบเทียบยอดรับชมผ่านหน้าจอ TV และ ออนไลน์</p>
+        </div>
+        <div class="w-full md:w-auto text-left md:text-right flex-shrink-0">
+            <span class="text-[11px] md:text-xs font-semibold text-slate-400 block uppercase mb-1">เลือกช่วงเวลาแสดงผล</span>
+            <select id="timeFilter" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm md:text-base rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 font-medium cursor-pointer transition-all" disabled>
+                <option value="">กำลังเชื่อมต่อข้อมูล...</option>
+            </select>
+        </div>
+    </header>
+
+    <!-- Key Takeaway Container -->
+    <div id="takeawayCard" class="bg-indigo-900 text-white p-5 md:p-6 rounded-xl shadow-lg relative overflow-hidden transition-all duration-300">
+        <div class="absolute right-0 top-0 opacity-10 pointer-events-none w-32 h-32 md:w-48 md:h-48">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M13 9V3.5L18.5 9M6 2c-1.11 0-2 .89-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6Z"/></svg>
+        </div>
+        <h2 class="text-indigo-200 text-[11px] md:text-xs font-bold uppercase tracking-widest mb-2">💡 สรุปภาพรวม (Automatic Insights)</h2>
+        <div id="keyTakeaway" class="text-[15px] md:text-lg font-medium leading-relaxed">
+            กำลังดึงข้อมูลและประมวลผลจาก Google Sheets...
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5">
+        
+        <!-- Table TV vs Online -->
+        <div class="col-span-1 lg:col-span-12 card relative">
+            <div class="flex justify-between items-end mb-3 md:mb-4">
+                <h3 id="tableTitle" class="font-bold text-base md:text-lg text-slate-700">ตารางสถิติแยกตามสื่อและแพลตฟอร์ม</h3>
+                <span class="text-[10px] text-slate-400 lg:hidden bg-slate-100 px-2 py-1 rounded-md">👈 เลื่อนซ้ายขวาเพื่อดู</span>
+            </div>
+            
+            <div class="overflow-x-auto custom-scrollbar pb-2 overscroll-x-contain rounded-lg border border-slate-200 shadow-sm">
+                <table class="w-full text-left border-collapse min-w-[480px] lg:min-w-full text-[13px] md:text-sm">
+                    <thead>
+                        <!-- หัวตารางแนวตั้ง: แพลตฟอร์มเป็นคอลัมน์ สื่อเป็นแถว -->
+                        <tr class="bg-slate-100 text-slate-600 border-b-2 border-slate-300">
+                            <th class="py-3 px-3 md:px-4 w-[150px] md:w-[22%] text-left align-middle font-bold text-slate-700 sticky left-0 z-20 bg-slate-100 border-r border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.03)]">สื่อ/ช่อง</th>
+                            <th class="py-2 px-1.5 text-center border-r border-slate-200">
+                                <div class="text-red-600 font-bold">YouTube</div><div class="text-[9px] font-normal text-slate-400">(Peak Concurrent)</div>
+                            </th>
+                            <th class="py-2 px-1.5 text-center border-r border-slate-200">
+                                <div class="text-blue-600 font-bold">Facebook</div><div class="text-[9px] font-normal text-slate-400">(Peak Concurrent)</div>
+                            </th>
+                            <th class="py-2 px-1.5 text-center border-r border-slate-200">
+                                <div class="text-black font-bold">TikTok</div><div class="text-[9px] font-normal text-slate-400">(Peak Concurrent)</div>
+                            </th>
+                            <th class="py-2 px-1.5 text-center border-r border-slate-300">
+                                <div class="text-slate-800 font-bold">X</div><div class="text-[9px] font-normal text-slate-400">(Total Views)</div>
+                            </th>
+                            <th class="py-2 px-3 text-center align-middle font-bold text-indigo-700 border-l border-slate-300">
+                                <div id="totalColHeader">ยอดชมรวมสุทธิ</div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTableBody" class="divide-y divide-slate-100">
+                        <tr><td colspan="6" class="text-center py-10 text-slate-500">กำลังดึงและจัดเรียงข้อมูล...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="col-span-1 lg:col-span-8 card">
+            <h3 class="font-bold text-base md:text-lg text-slate-700 mb-2 md:mb-4">📈 แนวโน้มการเติบโตยอดผู้ชม (แยกตามสำนักข่าว)</h3>
+            <div class="h-[240px] md:h-[300px]">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <div class="col-span-1 lg:col-span-4 card">
+            <h3 class="font-bold text-base md:text-lg text-slate-700 mb-2 md:mb-4">🍩 สัดส่วนยอดชมตามแพลตฟอร์ม</h3>
+            <div class="h-[240px] md:h-[300px] flex items-center justify-center">
+                <canvas id="platformChart"></canvas>
+            </div>
+        </div>
+
+        <div class="col-span-1 lg:col-span-12 card">
+            <h3 class="font-bold text-base md:text-lg text-slate-700 mb-2 md:mb-4">🚀 แนวโน้มการเติบโตยอดผู้ชม (แยกตาม Social Platform)</h3>
+            <div class="h-[240px] md:h-[300px]">
+                <canvas id="platformTrendChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // URL Web App API
+    const apiUrl = "https://script.google.com/macros/s/AKfycbwAAXuSHj0xYUxXwggiu3ySwM45h1gquYcqQZ5UBJ6YTZaUQaY-CRhve4YGigIS96cb/exec";
+
+    let allData = [];
+    let timeSet = new Set();
+    let platformChart = null;
+    let trendChart = null;
+    let platformTrendChart = null;
+
+
+    // การตั้งค่าช่องที่ทำ Cross Live (ถ้ายอด FB เท่ากัน จะถือว่าเป็นยอดเดียวกันเพื่อไม่ให้นับซ้ำ)
+    const crossLiveGroup = ["Thai PBS", "Thai PBS News", "PPTV", "Thairath Online", "Thairath TV", "THE STANDARD", "Matichon TV"];
+
+    function parseValue(val) {
+        if (val === undefined || val === null || val === '') return 0;
+        let str = val.toString().toLowerCase().replace(/,/g, '').replace(/"/g, '').trim();
+        if (str === '') return 0;
+        if (str.endsWith('k')) return parseFloat(str) * 1000;
+        if (str.endsWith('m')) return parseFloat(str) * 1000000;
+        return parseFloat(str) || 0;
+    }
+
+    function formatTimeDisplay(rawTime) {
+        if (!rawTime) return "-";
+        let timeStr = String(rawTime).trim();
+        if (timeStr.includes("T") && timeStr.includes("Z")) {
+            const dateObj = new Date(timeStr);
+            const hours = dateObj.getHours().toString().padStart(2, '0');
+            const minutes = dateObj.getMinutes().toString().padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+        return timeStr;
+    }
+
+    function getLogoHTML(name) {
+        if (!name) return `<div class="logo-placeholder">NA</div>`;
+        const upperName = name.toUpperCase();
+        let fallbackColor = "#64748b";
+        let imgSrc = "";
+        
+        if (upperName.includes('THAI PBS')) { fallbackColor = "#f26522"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/a/ad/Thai_PBS_logo.svg"; }
+        else if (upperName.includes('THAIRATH')) { fallbackColor = "#00a651"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/6/6d/Thairath_logo.svg"; }
+        else if (upperName.includes('PPTV')) { fallbackColor = "#00a0e3"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/0/00/PPTV_HD_36_logo.svg"; }
+        else if (upperName.includes('STANDARD')) { fallbackColor = "#000000"; imgSrc = "https://thestandard.co/wp-content/themes/thestandard/assets/images/logo-thestandard.svg"; }
+        else if (upperName.includes('MATICHON')) { fallbackColor = "#d12027"; imgSrc = "https://www.matichon.co.th/wp-content/uploads/2019/12/logo-matichon-board-2.png"; }
+        else if (upperName.includes('NATION')) { fallbackColor = "#0033a0"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/4/4e/Nation_TV_Logo.svg"; }
+        else if (upperName.includes('AMARIN')) { fallbackColor = "#ed1c24"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/3/3d/Amarin_TV_logo.svg"; }
+        else if (upperName.includes('TNN')) { fallbackColor = "#ed1c24"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/9/91/TNN_16_logo.svg"; }
+        else if (upperName.includes('CH7') || upperName.includes('7HD')) { fallbackColor = "#00a950"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/8/87/Channel_7_HD_logo.svg"; }
+        else if (upperName.includes('GMM')) { fallbackColor = "#000000"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/a/a2/GMM25_logo.svg"; }
+        else if (upperName.includes('NBT')) { fallbackColor = "#f37021"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/4/47/NBT_logo.svg"; }
+        else if (upperName.includes('VOICE')) { fallbackColor = "#000000"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/b/bd/Voice_TV_logo.svg"; }
+        else if (upperName.includes('TODAY')) { fallbackColor = "#ff0000"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/1/1a/Workpoint_Today_Logo.png"; }
+
+        const shortName = name.replace(/[^a-zA-Zก-ฮ0-9]/g, '').substring(0, 3).toUpperCase();
+        
+        if (imgSrc) {
+            return `<img src="${imgSrc}" alt="${name}" class="logo-img flex-shrink-0" onerror="this.outerHTML='<div class=\\'logo-placeholder flex-shrink-0\\' style=\\'background-color:${fallbackColor}\\'>${shortName}</div>'">`;
+        }
+        return `<div class="logo-placeholder flex-shrink-0" style="background-color:${fallbackColor}">${shortName}</div>`;
+    }
+
+    function showError(message) {
+        document.getElementById('takeawayCard').classList.replace('bg-indigo-900', 'bg-red-900');
+        document.getElementById('keyTakeaway').innerHTML = `
+            <div class="text-red-100">
+                <span class="font-bold text-xl block mb-2">⚠️ ขัดข้อง ไม่สามารถดึงข้อมูลได้</span>
+                <p class="text-sm opacity-90">${message}</p>
+                <p class="text-xs mt-3 bg-red-950/50 p-3 rounded-lg border border-red-800">
+                    โปรดตรวจสอบว่ารูปแบบตารางหรือการเชื่อมต่อ API ถูกต้อง
+                </p>
+            </div>`;
+        document.getElementById('dataTableBody').innerHTML = `<tr><td colspan="6" class="text-center py-12 text-red-500 font-bold bg-red-50 rounded-lg">❌ ไม่มีข้อมูลมาแสดงผล</td></tr>`;
+    }
+
+    async function fetchSheetData() {
+        try {
+            const response = await fetch(apiUrl + "?t=" + new Date().getTime());
+            if (!response.ok) throw new Error("Network Error");
+            const jsonData = await response.json();
+            processJSON(jsonData);
+        } catch (error) {
+            console.error("Fetch error:", error);
+            showError("ไม่สามารถเชื่อมต่อกับ API หรืออินเทอร์เน็ตมีปัญหา (" + error.message + ")");
+        }
+    }
+
+    // ฟังก์ชันอ่านข้อมูลที่ฉลาดขึ้น รองรับข้อมูลจาก JSON ที่คุณส่งมาให้
+    function processJSON(data) {
+        allData = [];
+        timeSet = new Set();
+        const rows = Array.isArray(data) ? data : (data.data || []);
+
+        if(rows.length <= 1) { // แถวแรกเป็น Header
+            showError("Google Sheets เชื่อมต่อได้ แต่ส่งข้อมูลกลับมาเป็นค่าว่าง");
+            return;
+        }
+
+        // ตัวแปรเก็บข้อมูลชั่วคราวจัดกลุ่มด้วยเวลาและช่อง
+        let groupedData = {};
+
+        // เริ่มที่ index 1 เพื่อข้ามหัวตาราง
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            
+            // โครงสร้างที่ส่งมา: "Time", "Channel name", "Platform", "Type", "Views", "Title"
+            let timeRaw = String(row[0] || '').trim();
+            let publisher = String(row[1] || '').trim();
+            let platformRaw = String(row[2] || '').toLowerCase().trim();
+            let typeRaw = String(row[3] || '').toLowerCase().trim();
+            let views = parseValue(row[4]);
+            
+            // ถ้าแถวไหนไม่มีเวลาหรือชื่อช่อง ให้ข้าม
+            if (!timeRaw || !publisher || timeRaw === "Time" || publisher === "Channel name") continue;
+
+            let timeStr = formatTimeDisplay(timeRaw);
+
+            // สร้างคีย์กลุ่มเพื่อให้ข้อมูลที่เวลาเดียวกันและช่องเดียวกันถูกรวมอยู่ด้วยกัน
+            let groupKey = timeStr + "_" + publisher;
+
+            // ถ้ายังไม่มีกลุ่มนี้ ให้สร้างขึ้นมาก่อน
+            if (!groupedData[groupKey]) {
+                groupedData[groupKey] = {
+                    time: timeStr,
+                    publisher: publisher,
+                    tv: { yt: 0, fb: 0, tk: 0, x: 0 },
+                    online: { yt: 0, fb: 0, tk: 0, x: 0 }
+                };
+                timeSet.add(timeStr);
+            }
+
+            // นำยอดวิวไปใส่ใน Platform และ Type ที่ถูกต้อง
+            if (typeRaw === 'tv') {
+                if (platformRaw === 'youtube') groupedData[groupKey].tv.yt += views;
+                else if (platformRaw === 'facebook') groupedData[groupKey].tv.fb += views;
+                else if (platformRaw === 'tiktok') groupedData[groupKey].tv.tk += views;
+                else if (platformRaw === 'x') groupedData[groupKey].tv.x += views;
+            } else if (typeRaw === 'online') {
+                if (platformRaw === 'youtube') groupedData[groupKey].online.yt += views;
+                else if (platformRaw === 'facebook') groupedData[groupKey].online.fb += views;
+                else if (platformRaw === 'tiktok') groupedData[groupKey].online.tk += views;
+                else if (platformRaw === 'x') groupedData[groupKey].online.x += views;
+            }
+        }
+
+        // แปลงข้อมูลที่จัดกลุ่มแล้วกลับมาเป็น array ที่เราใช้ในการแสดงผล
+        allData = Object.values(groupedData).map(row => {
+            row.sumYT = row.tv.yt + row.online.yt;
+            row.sumFB = row.tv.fb + row.online.fb;
+            row.sumTK = row.tv.tk + row.online.tk;
+            row.sumX = row.tv.x + row.online.x;
+            
+            row.totalTV = row.tv.yt + row.tv.fb + row.tv.tk + row.tv.x;
+            row.totalOnline = row.online.yt + row.online.fb + row.online.tk + row.online.x;
+            row.total = row.totalTV + row.totalOnline;
+            return row;
+        });
+
+        if (allData.length === 0) {
+            showError("ไม่พบข้อมูลสำนักข่าวและตัวเลข (โครงสร้างตารางอาจไม่ตรงกับที่ตั้งค่าไว้ โปรดตรวจสอบคอลัมน์ใน Google Sheets)");
+            return;
+        }
+
+        setupTimeFilter();
+        updateTrendChart();
+        updatePlatformTrendChart();
+    }
+
+    function setupTimeFilter() {
+        const timeFilter = document.getElementById('timeFilter');
+        timeFilter.innerHTML = '<option value="all">📊 ดูภาพรวมทั้งหมด (All Time)</option>';
+        
+        const sortedTimes = Array.from(timeSet).sort();
+        sortedTimes.forEach(t => {
+            const option = document.createElement('option');
+            option.value = t;
+            option.text = `🕒 สถิติ ณ เวลา ${t} น.`;
+            timeFilter.appendChild(option);
+        });
+
+        timeFilter.disabled = false;
+        
+        // บังคับให้โหลดหน้าแรกมา เป็นโหมด "ดูทั้งหมด (all)" เสมอ
+        timeFilter.value = 'all';
+        updateDashboard('all');
+    }
+
+    // ฟังก์ชันสร้างเซลล์ย่อย ตกแต่งสี
+    function getCellHTML(val, maxVal, bgClass = '') {
+        if (val === 0 || !val) return `<td class="py-2.5 px-2 text-center text-slate-300 border-r border-slate-200 ${bgClass}">-</td>`;
+        if (val === maxVal && val > 0) {
+            return `<td class="py-2.5 px-2 text-center border-r border-slate-200 ${bgClass}">
+                        <span class="text-red-600 font-extrabold text-[14px] md:text-[15px]">${val.toLocaleString()}</span>
+                    </td>`;
+        }
+        return `<td class="py-2.5 px-2 text-center text-slate-700 border-r border-slate-200 ${bgClass}">${val.toLocaleString()}</td>`;
+    }
+
+    function calculatePlatformTotals(timeTarget) {
+        let dataAtTime = allData.filter(d => d.time === timeTarget).map(d => ({...d}));
+        
+        dataAtTime.forEach(r => { r.skipFb = false; });
+        for (let i = 0; i < dataAtTime.length; i++) {
+            if (dataAtTime[i].skipFb) continue;
+            let pub1 = dataAtTime[i].publisher;
+            
+            // เช็ค Cross Live ด้วยผลรวม Facebook TV+Online
+            if (crossLiveGroup.includes(pub1) && dataAtTime[i].sumFB > 0) {
+                for (let j = i + 1; j < dataAtTime.length; j++) {
+                    let pub2 = dataAtTime[j].publisher;
+                    if (crossLiveGroup.includes(pub2) && dataAtTime[j].sumFB === dataAtTime[i].sumFB) {
+                        dataAtTime[j].skipFb = true; 
+                    }
+                }
+            }
+        }
+
+        let totYT = 0, totFB = 0, totTK = 0, totX = 0;
+        let totTV = 0, totOnline = 0;
+
+        dataAtTime.forEach(r => {
+            totYT += r.sumYT;
+            totTK += r.sumTK;
+            totX += r.sumX;
+            totTV += r.totalTV;
+            totOnline += r.totalOnline;
+            if (!r.skipFb) {
+                totFB += r.sumFB;
+            }
+        });
+        
+        return { yt: totYT, fb: totFB, tk: totTK, x: totX, tv: totTV, online: totOnline };
+    }
+
+    // ===== Helper: ช่องตระกูล Thai PBS =====
+    function isThaiPBS(name) {
+        return (name || '').toUpperCase().includes('THAI PBS');
+    }
+
+    // รวมยอดทุกช่องตระกูล Thai PBS ณ เวลาหนึ่ง (หักลบ Cross Live ภายในตระกูล)
+    function calculateThaiPBSTotals(timeTarget) {
+        let rows = allData.filter(d => d.time === timeTarget && isThaiPBS(d.publisher)).map(d => ({...d}));
+        rows.forEach(r => { r.skipFb = false; });
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].skipFb) continue;
+            if (rows[i].sumFB > 0) {
+                for (let j = i + 1; j < rows.length; j++) {
+                    if (rows[j].sumFB === rows[i].sumFB) rows[j].skipFb = true;
+                }
+            }
+        }
+        let yt = 0, fb = 0, tk = 0, x = 0, tv = 0, online = 0;
+        rows.forEach(r => {
+            yt += r.sumYT; tk += r.sumTK; x += r.sumX;
+            tv += r.totalTV; online += r.totalOnline;
+            if (!r.skipFb) fb += r.sumFB;
+        });
+        return { yt, fb, tk, x, tv, online, net: yt + fb + tk + x };
+    }
+
+    // จัดอันดับ "เอนทิตี" ณ เวลาหนึ่ง โดยรวมช่องตระกูล Thai PBS เป็นรายเดียว
+    function getEntityRankAtTime(timeTarget) {
+        const map = {};
+        const pbsNet = calculateThaiPBSTotals(timeTarget).net;
+        if (pbsNet > 0) map['Thai PBS (ทุกช่อง)'] = pbsNet;
+        allData.filter(d => d.time === timeTarget && !isThaiPBS(d.publisher)).forEach(r => {
+            map[r.publisher] = (map[r.publisher] || 0) + r.total;
+        });
+        return Object.entries(map).map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total);
+    }
+
+    // ฟังก์ชันสร้างรายงานโดยยึด Thai PBS เป็นหลัก + เทียบคู่แข่ง
+    function generateDetailedAllTimeInsights(sortedTimes) {
+        if (allData.length === 0) return "ไม่มีข้อมูล";
+
+        // หาช่วงพีคของ Thai PBS (อิงยอดรวมทุกช่องตระกูล)
+        let pbsPeakTime = "-", pbsPeak = 0, pbsStart = 0;
+        sortedTimes.forEach((t, idx) => {
+            const net = calculateThaiPBSTotals(t).net;
+            if (idx === 0) pbsStart = net;
+            if (net > pbsPeak) { pbsPeak = net; pbsPeakTime = t; }
+        });
+        if (pbsPeak === 0) pbsPeakTime = sortedTimes[sortedTimes.length - 1] || "-";
+
+        const pbsAtPeak = calculateThaiPBSTotals(pbsPeakTime);
+        const pbsGrowth = pbsStart > 0 ? (((pbsPeak - pbsStart) / pbsStart) * 100).toFixed(1) : 0;
+
+        const pbsPlatforms = [
+            { name: "YouTube", value: pbsAtPeak.yt },
+            { name: "Facebook", value: pbsAtPeak.fb },
+            { name: "TikTok", value: pbsAtPeak.tk },
+            { name: "X (Twitter)", value: pbsAtPeak.x }
+        ].sort((a, b) => b.value - a.value);
+        const pbsDominant = pbsPlatforms[0];
+        const pbsDomPct = pbsPeak > 0 ? ((pbsDominant.value / pbsPeak) * 100).toFixed(1) : 0;
+
+        const pbsTvOnline = pbsAtPeak.tv + pbsAtPeak.online;
+        const pbsPctTV = pbsTvOnline > 0 ? ((pbsAtPeak.tv / pbsTvOnline) * 100).toFixed(1) : 0;
+        const pbsPctOnline = pbsTvOnline > 0 ? ((pbsAtPeak.online / pbsTvOnline) * 100).toFixed(1) : 0;
+
+        // เทียบคู่แข่ง ณ เวลาพีคของ Thai PBS
+        const ranking = getEntityRankAtTime(pbsPeakTime);
+        const grandAtPeak = ranking.reduce((s, r) => s + r.total, 0);
+        const pbsRank = ranking.findIndex(r => r.name.indexOf('Thai PBS') === 0) + 1;
+        const pbsShare = grandAtPeak > 0 ? ((pbsPeak / grandAtPeak) * 100).toFixed(1) : 0;
+        const leader = ranking[0] || { name: "-", total: 0 };
+        const isPbsLeader = leader.name.indexOf('Thai PBS') === 0;
+        const topCompetitor = ranking.find(r => r.name.indexOf('Thai PBS') !== 0) || { name: "-", total: 0 };
+        const gapMultiple = topCompetitor.total > 0 ? (pbsPeak / topCompetitor.total).toFixed(2) : '-';
+        const behindPct = leader.total > 0 ? (((leader.total - pbsPeak) / leader.total) * 100).toFixed(1) : 0;
+
+        return `
+            <div class="space-y-4 text-slate-100">
+                <div class="border-b border-indigo-800 pb-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                    <div>
+                        <h3 class="text-lg md:text-xl font-bold text-yellow-300 flex items-center gap-2">
+                            <span>📊</span> บทวิเคราะห์ภาพรวมเชิงสถิติ : กรณีศึกษา Thai PBS
+                        </h3>
+                        <p class="text-[11px] md:text-xs text-indigo-200 mt-1">วิเคราะห์ยอดรับชมโดยใช้กลุ่มช่อง Thai PBS เป็นหน่วยอ้างอิงหลัก (benchmark) เทียบกับคู่แข่งในตลาด</p>
+                    </div>
+                    <span class="bg-yellow-400 text-slate-950 text-[10px] md:text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Thai PBS Focus</span>
+                </div>
+
+                <!-- การ์ดตัวเลขสรุปผล (ยึด Thai PBS) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-1 text-slate-100">
+                    <div class="bg-indigo-950/60 p-3.5 rounded-lg border border-indigo-800">
+                        <span class="text-[10px] md:text-[11px] text-indigo-300 uppercase tracking-wider block font-semibold">ยอดรับชมสูงสุด (Peak Viewership)</span>
+                        <span class="text-xl md:text-2xl font-extrabold text-white block mt-1">${pbsPeak.toLocaleString()} <span class="text-xs font-normal">วิว</span></span>
+                        <span class="text-[10px] md:text-[11px] text-green-400 block mt-1">📈 อัตราการเติบโต +${pbsGrowth}% เทียบจุดเริ่มต้น</span>
+                    </div>
+                    <div class="bg-indigo-950/60 p-3.5 rounded-lg border border-indigo-800">
+                        <span class="text-[10px] md:text-[11px] text-indigo-300 uppercase tracking-wider block font-semibold">ช่วงเวลาพีค (Peak Window)</span>
+                        <span class="text-xl md:text-2xl font-extrabold text-yellow-300 block mt-1">เวลา ${pbsPeakTime} น.</span>
+                        <span class="text-[10px] md:text-[11px] text-indigo-200 block mt-1">จุดที่ความต้องการรับชมสูงสุด</span>
+                    </div>
+                    <div class="bg-indigo-950/60 p-3.5 rounded-lg border border-indigo-800">
+                        <span class="text-[10px] md:text-[11px] text-indigo-300 uppercase tracking-wider block font-semibold">แพลตฟอร์มหลัก (Dominant Channel)</span>
+                        <span class="text-xl md:text-2xl font-extrabold text-white block mt-1 truncate">${pbsDominant.name}</span>
+                        <span class="text-[10px] md:text-[11px] text-indigo-200 block mt-1">ครองสัดส่วน ${pbsDomPct}% ของยอด Thai PBS</span>
+                    </div>
+                    <div class="bg-indigo-950/60 p-3.5 rounded-lg border border-indigo-800">
+                        <span class="text-[10px] md:text-[11px] text-indigo-300 uppercase tracking-wider block font-semibold">โครงสร้างการรับชม (TV / Online)</span>
+                        <span class="text-xl md:text-2xl font-extrabold text-yellow-300 block mt-1">TV <span class="text-sm md:text-base font-normal">vs</span> Online</span>
+                        <span class="text-[10px] md:text-[11px] text-indigo-200 block mt-1">📺 TV ${pbsPctTV}% / 🌐 ออนไลน์ ${pbsPctOnline}%</span>
+                    </div>
+                </div>
+
+                <!-- สรุป 3 จุดน่าสนใจ (Thai PBS + คู่แข่ง) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 text-sm leading-relaxed text-indigo-100">
+                    <div class="bg-indigo-950/30 p-4 rounded-lg border border-indigo-800/40">
+                        <h4 class="font-bold text-yellow-300 mb-2 flex items-center gap-1.5 text-sm">
+                            <span>🏆</span> 1. ตำแหน่งเชิงการแข่งขัน (Market Position)
+                        </h4>
+                        <p class="text-[11px] md:text-xs text-indigo-150 leading-relaxed">
+                            ณ ช่วงพีค (${pbsPeakTime} น.) ยอดรับชมรวมของกลุ่มช่อง Thai PBS อยู่ที่ <b>${pbsPeak.toLocaleString()}</b> วิว ${isPbsLeader ? `จัดอยู่ใน <b class="text-yellow-300">อันดับ 1</b> ของตลาด` : `จัดอยู่ใน <b>อันดับที่ ${pbsRank}</b>`} คิดเป็นส่วนแบ่งการรับชม (viewership share) ราว <b>${pbsShare}%</b> ของทั้งอุตสาหกรรมในช่วงเวลาดังกล่าว
+                        </p>
+                    </div>
+
+                    <div class="bg-indigo-950/30 p-4 rounded-lg border border-indigo-800/40">
+                        <h4 class="font-bold text-yellow-300 mb-2 flex items-center gap-1.5 text-sm">
+                            <span>⚔️</span> 2. การเปรียบเทียบกับคู่แข่ง (Benchmarking)
+                        </h4>
+                        <p class="text-[11px] md:text-xs text-indigo-150 leading-relaxed">
+                            ${isPbsLeader
+                                ? `Thai PBS ครองตำแหน่งผู้นำ โดยมียอดรับชมสูงกว่าคู่แข่งอันดับรองอย่าง <b>${topCompetitor.name}</b> (${topCompetitor.total.toLocaleString()} วิว) คิดเป็นอัตราส่วนราว <b class="text-green-400">${gapMultiple} เท่า</b>`
+                                : `ผู้นำตลาดในช่วงเวลานี้คือ <b>${leader.name}</b> (${leader.total.toLocaleString()} วิว) ขณะที่ Thai PBS มียอดต่ำกว่าผู้นำราว <b>${behindPct}%</b> ซึ่งเป็นช่องว่างที่สะท้อนศักยภาพในการเติบโต`}
+                        </p>
+                    </div>
+
+                    <div class="bg-indigo-950/30 p-4 rounded-lg border border-indigo-800/40">
+                        <h4 class="font-bold text-yellow-300 mb-2 flex items-center gap-1.5 text-sm">
+                            <span>📱</span> 3. การกระจายตัวตามแพลตฟอร์ม (Platform Mix)
+                        </h4>
+                        <p class="text-[11px] md:text-xs text-indigo-150 leading-relaxed">
+                            ฐานผู้ชม Thai PBS กระจุกตัวบน <b>${pbsDominant.name}</b> เป็นหลักที่สัดส่วน ${pbsDomPct}% รองลงมาคือ ${pbsPlatforms[1].name} เมื่อจำแนกตามช่องทางพบว่าเป็นการรับชมผ่านหน้าจอ TV ${pbsPctTV}% และผ่านออนไลน์ ${pbsPctOnline}% บ่งชี้พฤติกรรมการรับชมที่โน้มเอียงไปทาง${Number(pbsPctOnline) >= Number(pbsPctTV) ? 'แพลตฟอร์มออนไลน์' : 'หน้าจอโทรทัศน์'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function updateDashboard(selectedTime) {
+        let filteredData = [];
+        const tableTitle = document.getElementById('tableTitle');
+        const totalColHeader = document.getElementById('totalColHeader');
+        
+        if (selectedTime === 'all') {
+            tableTitle.innerHTML = "ตารางสถิติผู้เข้าชมสูงสุด (All-Time Peak Summary รายสำนักข่าว)";
+            totalColHeader.innerHTML = "Peak สูงสุดรวม";
+            
+            const pubMap = {};
+            allData.forEach(row => {
+                const pub = row.publisher;
+                if (!pubMap[pub]) {
+                    pubMap[pub] = {
+                        publisher: pub,
+                        tv: { yt: 0, fb: 0, tk: 0, x: 0 },
+                        online: { yt: 0, fb: 0, tk: 0, x: 0 },
+                        sumYT: 0, sumFB: 0, sumTK: 0, sumX: 0,
+                        total: 0,
+                        time: 'all',
+                        skipFb: false
+                    };
+                }
+                pubMap[pub].tv.yt = Math.max(pubMap[pub].tv.yt, row.tv.yt);
+                pubMap[pub].tv.fb = Math.max(pubMap[pub].tv.fb, row.tv.fb);
+                pubMap[pub].tv.tk = Math.max(pubMap[pub].tv.tk, row.tv.tk);
+                pubMap[pub].tv.x = Math.max(pubMap[pub].tv.x, row.tv.x);
+
+                pubMap[pub].online.yt = Math.max(pubMap[pub].online.yt, row.online.yt);
+                pubMap[pub].online.fb = Math.max(pubMap[pub].online.fb, row.online.fb);
+                pubMap[pub].online.tk = Math.max(pubMap[pub].online.tk, row.online.tk);
+                pubMap[pub].online.x = Math.max(pubMap[pub].online.x, row.online.x);
+
+                pubMap[pub].sumFB = Math.max(pubMap[pub].sumFB, row.sumFB);
+            });
+            filteredData = Object.values(pubMap);
+            filteredData.forEach(row => {
+                row.total = row.tv.yt + row.tv.fb + row.tv.tk + row.tv.x + row.online.yt + row.online.fb + row.online.tk + row.online.x;
+            });
+        } else {
+            tableTitle.innerHTML = `ตารางสถิติแยกตามสื่อและแพลตฟอร์ม ณ เวลา ${selectedTime} น.`;
+            totalColHeader.innerHTML = "ยอดชมรวม";
+            filteredData = allData.filter(d => d.time === selectedTime).map(d => ({
+                ...d, 
+                tv: {...d.tv}, 
+                online: {...d.online}
+            }));
+        }
+
+        if(filteredData.length === 0) return;
+
+        const tableBody = document.getElementById('dataTableBody');
+        tableBody.innerHTML = '';
+
+        let totalYT = 0, totalFB = 0, totalTK = 0, totalX = 0;
+        let topPublisher = { name: '-', total: 0 };
+
+        // โลจิกหักลบ Cross Live
+        filteredData.forEach(r => { r.skipFb = false; });
+        for (let i = 0; i < filteredData.length; i++) {
+            if (filteredData[i].skipFb) continue;
+            let pub1 = filteredData[i].publisher;
+            if (crossLiveGroup.includes(pub1) && filteredData[i].sumFB > 0) {
+                for (let j = i + 1; j < filteredData.length; j++) {
+                    let pub2 = filteredData[j].publisher;
+                    if (crossLiveGroup.includes(pub2) && filteredData[j].sumFB === filteredData[i].sumFB) {
+                        filteredData[j].skipFb = true;
+                    }
+                }
+            }
+        }
+
+        // รวมยอดสำหรับ Insights / กราฟ (ไม่ขึ้นกับการแสดงผลแบบแนวตั้ง)
+        filteredData.forEach(row => {
+            totalYT += (row.tv.yt + row.online.yt);
+            totalTK += (row.tv.tk + row.online.tk);
+            totalX += (row.tv.x + row.online.x);
+            if (!row.skipFb) { totalFB += row.sumFB; }
+
+            if (row.total > topPublisher.total) {
+                topPublisher.name = row.publisher;
+                topPublisher.total = row.total;
+            }
+        });
+
+        // ===== แสดงผลแบบแนวตั้ง: แยกเป็นบล็อก TV และ ออนไลน์ =====
+        // แยกแถวที่มียอดฝั่ง TV และฝั่ง Online
+        const tvRows = filteredData.filter(d => (d.tv.yt + d.tv.fb + d.tv.tk + d.tv.x) > 0);
+        const onRows = filteredData.filter(d => (d.online.yt + d.online.fb + d.online.tk + d.online.x) > 0);
+
+        // ค่าสูงสุดของแต่ละคอลัมน์ (ไว้ไฮไลต์สีแดง) แยกตามบล็อก
+        const mx = (arr, fn) => arr.length ? Math.max(...arr.map(fn)) : 0;
+        const maxTvYT = mx(tvRows, d => d.tv.yt), maxTvFB = mx(tvRows, d => d.tv.fb), maxTvTK = mx(tvRows, d => d.tv.tk), maxTvX = mx(tvRows, d => d.tv.x);
+        const maxOnYT = mx(onRows, d => d.online.yt), maxOnFB = mx(onRows, d => d.online.fb), maxOnTK = mx(onRows, d => d.online.tk), maxOnX = mx(onRows, d => d.online.x);
+        const tvTotalOf = d => d.tv.yt + d.tv.fb + d.tv.tk + d.tv.x;
+        const onTotalOf = d => d.online.yt + d.online.fb + d.online.tk + d.online.x;
+        const maxTvTotal = mx(tvRows, tvTotalOf);
+        const maxOnTotal = mx(onRows, onTotalOf);
+
+        function sectionDivider(label, bg) {
+            return `<tr><td colspan="6" class="py-2.5 px-3 font-bold text-slate-700 ${bg} border-y border-slate-300 text-[13px] md:text-sm sticky left-0">${label}</td></tr>`;
+        }
+        function publisherCell(pub) {
+            return `<td class="py-2 px-3 flex items-center gap-2 sticky left-0 z-10 bg-white group-hover:bg-slate-100 transition-colors border-r border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                        ${getLogoHTML(pub)}
+                        <span class="font-semibold text-slate-700 truncate w-full pr-1 text-[12px] md:text-sm">${pub}</span>
+                    </td>`;
+        }
+        function totalCellHTML(val, maxVal) {
+            if (val === 0) return `<td class="py-2.5 px-3 text-center text-slate-300 bg-slate-50/50 border-l border-slate-300">-</td>`;
+            if (val === maxVal && val > 0) return `<td class="py-2.5 px-3 text-center bg-slate-50/50 border-l border-slate-300"><span class="text-red-600 font-extrabold text-[15px] md:text-lg whitespace-nowrap">👑 ${val.toLocaleString()}</span></td>`;
+            return `<td class="py-2.5 px-3 text-center font-bold text-indigo-700 bg-slate-50/50 border-l border-slate-300">${val.toLocaleString()}</td>`;
+        }
+
+        // บล็อก TV
+        if (tvRows.length) {
+            tableBody.insertAdjacentHTML('beforeend', sectionDivider('📺 หน้าจอ TV', 'bg-blue-50'));
+            tvRows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "group hover:bg-slate-100 transition-colors";
+                tr.innerHTML =
+                    publisherCell(row.publisher) +
+                    getCellHTML(row.tv.yt, maxTvYT, 'bg-blue-50/20') +
+                    getCellHTML(row.tv.fb, maxTvFB, 'bg-blue-50/20') +
+                    getCellHTML(row.tv.tk, maxTvTK, 'bg-blue-50/20') +
+                    getCellHTML(row.tv.x, maxTvX, 'bg-blue-50/20 border-r-slate-300') +
+                    totalCellHTML(tvTotalOf(row), maxTvTotal);
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // บล็อก Online
+        if (onRows.length) {
+            tableBody.insertAdjacentHTML('beforeend', sectionDivider('🌐 รายการพิเศษทางออนไลน์', 'bg-emerald-50'));
+            onRows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "group hover:bg-slate-100 transition-colors";
+                tr.innerHTML =
+                    publisherCell(row.publisher) +
+                    getCellHTML(row.online.yt, maxOnYT, 'bg-emerald-50/20') +
+                    getCellHTML(row.online.fb, maxOnFB, 'bg-emerald-50/20') +
+                    getCellHTML(row.online.tk, maxOnTK, 'bg-emerald-50/20') +
+                    getCellHTML(row.online.x, maxOnX, 'bg-emerald-50/20 border-r-slate-300') +
+                    totalCellHTML(onTotalOf(row), maxOnTotal);
+                tableBody.appendChild(tr);
+            });
+        }
+
+        const sortedTimes = Array.from(timeSet).sort();
+        if (selectedTime === 'all') {
+            document.getElementById('keyTakeaway').innerHTML = generateDetailedAllTimeInsights(sortedTimes);
+        } else {
+            const grandTotal = totalYT + totalFB + totalTK + totalX;
+            const timeText = `สถิติ ณ เวลา ${selectedTime} น.`;
+            
+            if (grandTotal === 0) {
+                document.getElementById('keyTakeaway').innerHTML = `<div class="text-indigo-200 font-medium">${timeText} : ยังไม่มีข้อมูลการเข้าชมในระบบขณะนี้</div>`;
+            } else {
+                const platforms = [
+                    { name: 'YouTube', total: totalYT },
+                    { name: 'Facebook', total: totalFB },
+                    { name: 'TikTok', total: totalTK },
+                    { name: 'X (Twitter)', total: totalX }
+                ].sort((a, b) => b.total - a.total);
+                
+                const topPlatform = platforms[0];
+
+                document.getElementById('keyTakeaway').innerHTML = `
+                    <div class="space-y-1">
+                        <div class="text-[10px] md:text-xs text-indigo-300 font-bold uppercase tracking-wider">ผลวิเคราะห์ ณ จุดเวลา (Cross-sectional Snapshot)</div>
+                        <p class="text-sm md:text-lg font-medium leading-relaxed">
+                            ${timeText} ยอดผู้ชมพร้อมกันสะสม (aggregate concurrent viewership) อยู่ที่ <b>${grandTotal.toLocaleString()}</b> วิว
+                            โดยช่องที่มีส่วนแบ่งสูงสุดคือ <span class="text-yellow-300 font-bold">${topPublisher.name}</span> ที่ ${topPublisher.total.toLocaleString()} วิว
+                            ขณะที่แพลตฟอร์มซึ่งครองสัดส่วนการรับชมมากที่สุดได้แก่ <span class="text-yellow-300 font-bold">${topPlatform.name}</span>
+                            คิดเป็น ${((topPlatform.total / grandTotal) * 100).toFixed(1)}% ของยอดรวม
+                        </p>
+                        <span class="text-[9px] md:text-[11px] text-indigo-300 block opacity-80 pt-1">* ตัวเลขปรับค่าด้วยการหักลบยอดนับซ้ำ (de-duplication) ของเพจที่ถ่ายทอดสัญญาณร่วมกัน (Cross Live) เพื่อสะท้อนยอดผู้ชมสุทธิ</span>
+                    </div>
+                `;
+            }
+        }
+
+        if (selectedTime === 'all') {
+            let maxTotalYT = 0, maxTotalFB = 0, maxTotalTK = 0, maxTotalX = 0;
+            filteredData.forEach(r => {
+                maxTotalYT += (r.tv.yt + r.online.yt);
+                maxTotalFB += (r.tv.fb + r.online.fb);
+                maxTotalTK += (r.tv.tk + r.online.tk);
+                maxTotalX += (r.tv.x + r.online.x);
+            });
+            updatePlatformChart([maxTotalYT, maxTotalFB, maxTotalTK, maxTotalX]);
+        } else {
+            updatePlatformChart([totalYT, totalFB, totalTK, totalX]);
+        }
+    }
+
+    function updatePlatformChart(dataValues) {
+        const ctx = document.getElementById('platformChart').getContext('2d');
+        if (platformChart) platformChart.destroy();
+        const isMobile = window.innerWidth < 768;
+
+        platformChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['YouTube', 'Facebook', 'TikTok', 'X'],
+                datasets: [{
+                    data: dataValues,
+                    backgroundColor: ['#ef4444', '#3b82f6', '#000000', '#64748b'],
+                    borderWidth: 0,
+                    hoverOffset: 5
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '65%',
+                plugins: {
+                    legend: {
+                        position: isMobile ? 'right' : 'bottom',
+                        labels: {
+                            font: { family: 'Niramit', size: isMobile ? 10 : 12 },
+                            usePointStyle: true,
+                            padding: isMobile ? 10 : 18,
+                            generateLabels: function(chart) {
+                                const ds = chart.data.datasets[0];
+                                const grand = ds.data.reduce((a, b) => a + (b || 0), 0);
+                                return chart.data.labels.map((label, i) => {
+                                    const val = ds.data[i] || 0;
+                                    const pct = grand > 0 ? ((val / grand) * 100).toFixed(1) : '0.0';
+                                    return {
+                                        text: `${label}  ${pct}%`,
+                                        fillStyle: ds.backgroundColor[i],
+                                        strokeStyle: ds.backgroundColor[i],
+                                        pointStyle: 'circle',
+                                        hidden: false,
+                                        index: i
+                                    };
+                                });
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const ds = ctx.dataset;
+                                const grand = ds.data.reduce((a, b) => a + (b || 0), 0);
+                                const val = ctx.parsed || 0;
+                                const pct = grand > 0 ? ((val / grand) * 100).toFixed(1) : '0.0';
+                                return ` ${ctx.label}: ${val.toLocaleString()} วิว (${pct}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function updateTrendChart() {
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        const sortedTimes = Array.from(timeSet).sort();
+        const publishers = [...new Set(allData.map(d => d.publisher))];
+        const lineColors = ['#f26522', '#00a651', '#00a0e3', '#000000', '#d12027', '#8b5cf6', '#ec4899', '#64748b'];
+
+        const datasets = publishers.map((pub, idx) => {
+            return {
+                label: pub,
+                data: sortedTimes.map(t => {
+                    const found = allData.find(d => d.time === t && d.publisher === pub);
+                    return found ? found.total : 0;
+                }),
+                borderColor: lineColors[idx % lineColors.length], backgroundColor: lineColors[idx % lineColors.length],
+                borderWidth: 2, tension: 0.3, pointRadius: 2, pointHoverRadius: 5
+            };
+        });
+
+        if (trendChart) trendChart.destroy();
+        const isMobile = window.innerWidth < 768;
+
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: sortedTimes, datasets: datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { position: 'top', labels: { font: { family: 'Niramit', size: isMobile ? 9 : 11 }, usePointStyle: true, boxWidth: 6, padding: 8 } } },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'ยอดชม (View)', font: { family: 'Niramit', weight: 'bold', size: isMobile ? 10 : 12 } }, grid: { borderDash: [5, 5] }, ticks: { font: { family: 'Niramit', size: isMobile ? 9 : 11 } } },
+                    x: { title: { display: true, text: 'เวลา (น.)', font: { family: 'Niramit', weight: 'bold', size: isMobile ? 10 : 12 } }, grid: { display: false }, ticks: { font: { family: 'Niramit', size: isMobile ? 9 : 11 } } }
+                }
+            }
+        });
+    }
+
+    function updatePlatformTrendChart() {
+        const ctx = document.getElementById('platformTrendChart').getContext('2d');
+        const sortedTimes = Array.from(timeSet).sort();
+
+        const datasets = [
+            { label: 'YouTube', data: sortedTimes.map(t => calculatePlatformTotals(t).yt), borderColor: '#ef4444', backgroundColor: '#ef4444', borderWidth: 2, tension: 0.3, pointRadius: 2 },
+            { label: 'Facebook', data: sortedTimes.map(t => calculatePlatformTotals(t).fb), borderColor: '#3b82f6', backgroundColor: '#3b82f6', borderWidth: 2, tension: 0.3, pointRadius: 2 },
+            { label: 'TikTok', data: sortedTimes.map(t => calculatePlatformTotals(t).tk), borderColor: '#000000', backgroundColor: '#000000', borderWidth: 2, tension: 0.3, pointRadius: 2 },
+            { label: 'X (Twitter)', data: sortedTimes.map(t => calculatePlatformTotals(t).x), borderColor: '#64748b', backgroundColor: '#64748b', borderWidth: 2, tension: 0.3, pointRadius: 2 }
+        ];
+
+        if (platformTrendChart) platformTrendChart.destroy();
+        const isMobile = window.innerWidth < 768;
+
+        platformTrendChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: sortedTimes, datasets: datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { position: 'top', labels: { font: { family: 'Niramit', size: isMobile ? 10 : 11 }, usePointStyle: true, boxWidth: 8, padding: 10 } } },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'ยอดชม (View)', font: { family: 'Niramit', weight: 'bold', size: isMobile ? 10 : 12 } }, grid: { borderDash: [5, 5] }, ticks: { font: { family: 'Niramit', size: isMobile ? 9 : 11 } } },
+                    x: { title: { display: true, text: 'เวลา (น.)', font: { family: 'Niramit', weight: 'bold', size: isMobile ? 10 : 12 } }, grid: { display: false }, ticks: { font: { family: 'Niramit', size: isMobile ? 9 : 11 } } }
+                }
+            }
+        });
+    }
+
+    document.getElementById('timeFilter').addEventListener('change', (e) => updateDashboard(e.target.value));
+    window.addEventListener('resize', () => {
+        if(platformChart) updatePlatformChart(platformChart.data.datasets[0].data);
+        if(trendChart) updateTrendChart();
+        if(platformTrendChart) updatePlatformTrendChart();
+    });
+
+    fetchSheetData();
+
+</script>
+
+</body>
+</html>
