@@ -181,9 +181,10 @@
 
 <script>
     // URL Web App API
-    const apiUrl = "https://script.google.com/macros/s/AKfycbwAAXuSHj0xYUxXwggiu3ySwM45h1gquYcqQZ5UBJ6YTZaUQaY-CRhve4YGigIS96cb/exec";
+    const apiUrl = "https://script.google.com/macros/s/AKfycbw-gwKJh3KCM2OPkMP1EDlU_rGKVKXUf7okL9zOqzzpRTcoIyLxeEwyKhhf-Ty8Qved/exec";
 
     let allData = [];
+    let logoMap = {};
     let timeSet = new Set();
     let platformChart = null;
     let trendChart = null;
@@ -232,12 +233,26 @@
     }
     function timeCompare(a, b) { return timeKey(a) - timeKey(b); }
 
+    // แปลงลิงก์โลโก้ให้แสดงเป็นรูปได้ (รองรับลิงก์แชร์ของ Google Drive)
+    function normalizeLogoUrl(u) {
+        if (!u) return "";
+        u = String(u).trim();
+        var m = u.match(/drive\.google\.com\/file\/d\/([^/]+)/) || u.match(/[?&]id=([^&]+)/);
+        if (m) return 'https://lh3.googleusercontent.com/d/' + m[1];
+        return u;
+    }
+
     function getLogoHTML(name) {
         if (!name) return `<div class="logo-placeholder">NA</div>`;
         const upperName = name.toUpperCase();
         let fallbackColor = "#64748b";
         let imgSrc = "";
-        
+
+        // ลำดับแรก: ใช้โลโก้จาก Sheet 2 ที่ผูกผ่าน API (จับคู่กับ Publisher Name แบบตรงตัว)
+        if (logoMap) imgSrc = normalizeLogoUrl(logoMap[name] || logoMap[String(name).trim()] || "");
+
+        // สำรอง: โลโก้ที่กำหนดไว้ในโค้ด (ใช้เมื่อ Sheet 2 ไม่มีค่า Logo)
+        if (!imgSrc) {
         if (upperName.includes('THAI PBS')) { fallbackColor = "#f26522"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/a/ad/Thai_PBS_logo.svg"; }
         else if (upperName.includes('THAIRATH')) { fallbackColor = "#00a651"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/6/6d/Thairath_logo.svg"; }
         else if (upperName.includes('PPTV')) { fallbackColor = "#00a0e3"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/0/00/PPTV_HD_36_logo.svg"; }
@@ -251,6 +266,7 @@
         else if (upperName.includes('NBT')) { fallbackColor = "#f37021"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/4/47/NBT_logo.svg"; }
         else if (upperName.includes('VOICE')) { fallbackColor = "#000000"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/b/bd/Voice_TV_logo.svg"; }
         else if (upperName.includes('TODAY')) { fallbackColor = "#ff0000"; imgSrc = "https://upload.wikimedia.org/wikipedia/commons/1/1a/Workpoint_Today_Logo.png"; }
+        }
 
         const shortName = name.replace(/[^a-zA-Zก-ฮ0-9]/g, '').substring(0, 3).toUpperCase();
         
@@ -290,6 +306,7 @@
         allData = [];
         timeSet = new Set();
         const rows = Array.isArray(data) ? data : (data.data || []);
+        logoMap = (!Array.isArray(data) && data && data.logos) ? data.logos : {};
 
         if(rows.length <= 1) { // แถวแรกเป็น Header
             showError("Google Sheets เชื่อมต่อได้ แต่ส่งข้อมูลกลับมาเป็นค่าว่าง");
@@ -1050,4 +1067,4 @@
 </script>
 
 </body>
-</html>
+</html>                   
