@@ -156,14 +156,14 @@
         </div>
 
         <div class="col-span-1 lg:col-span-8 card">
-            <h3 class="font-bold text-base md:text-lg text-slate-700 mb-2 md:mb-4">📈 แนวโน้มการเติบโตยอดผู้ชม (แยกตามสำนักข่าว)</h3>
+            <h3 class="font-bold text-base md:text-lg text-slate-700 mb-2 md:mb-4">📈 สถิติยอดวิวรวมตามช่วงเวลา (Peak Concurrent)</h3>
             <div class="h-[240px] md:h-[300px]">
                 <canvas id="trendChart"></canvas>
             </div>
         </div>
 
         <div class="col-span-1 lg:col-span-4 card">
-            <h3 class="font-bold text-base md:text-lg text-slate-700 mb-2 md:mb-4">🍩 สัดส่วนยอดชมตามแพลตฟอร์ม</h3>
+            <h3 class="font-bold text-base md:text-lg text-slate-700 mb-2 md:mb-4">🍩 ยอดชมรวมตามแพลตฟอร์ม (Peak Concurrent)</h3>
             <div class="h-[240px] md:h-[300px] flex items-center justify-center">
                 <canvas id="platformChart"></canvas>
             </div>
@@ -206,14 +206,31 @@
     function formatTimeDisplay(rawTime) {
         if (!rawTime) return "-";
         let timeStr = String(rawTime).trim();
-        if (timeStr.includes("T") && timeStr.includes("Z")) {
+        // กรณีเป็น ISO datetime (มี T) -> แสดงเป็น "วัน/เดือน/ปี, ชม:นาที" (ตัดวินาที)
+        if (timeStr.includes("T")) {
             const dateObj = new Date(timeStr);
-            const hours = dateObj.getHours().toString().padStart(2, '0');
-            const minutes = dateObj.getMinutes().toString().padStart(2, '0');
-            return `${hours}:${minutes}`;
+            if (!isNaN(dateObj.getTime())) {
+                const dd = dateObj.getDate();
+                const mm = dateObj.getMonth() + 1;
+                const yyyy = dateObj.getFullYear();
+                const hh = dateObj.getHours().toString().padStart(2, '0');
+                const mi = dateObj.getMinutes().toString().padStart(2, '0');
+                return `${dd}/${mm}/${yyyy}, ${hh}:${mi}`;
+            }
         }
-        return timeStr;
+        // กรณีเป็นสตริงวัน-เวลาธรรมดา: ตัดวินาทีออก (เช่น 19:30:45 -> 19:30)
+        return timeStr.replace(/(\d{1,2}:\d{2}):\d{2}/, '$1');
     }
+
+    // แปลงสตริงเวลา "D/M/YYYY, HH:MM" เป็นค่าตัวเลขสำหรับเรียงลำดับ
+    function timeKey(s) {
+        const m = String(s).match(/(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s*(\d{1,2}):(\d{2})/);
+        if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]).getTime();
+        const t = String(s).match(/(\d{1,2}):(\d{2})/);
+        if (t) return (+t[1]) * 60 + (+t[2]);
+        return 0;
+    }
+    function timeCompare(a, b) { return timeKey(a) - timeKey(b); }
 
     function getLogoHTML(name) {
         if (!name) return `<div class="logo-placeholder">NA</div>`;
@@ -353,7 +370,7 @@
         const timeFilter = document.getElementById('timeFilter');
         timeFilter.innerHTML = '<option value="all">📊 ดูภาพรวมทั้งหมด (All Time)</option>';
         
-        const sortedTimes = Array.from(timeSet).sort();
+        const sortedTimes = Array.from(timeSet).sort(timeCompare);
         sortedTimes.forEach(t => {
             const option = document.createElement('option');
             option.value = t;
@@ -428,7 +445,7 @@
     function renderAllTimesBreakdown() {
         const cont = document.getElementById('allTimesBreakdown');
         if (!cont) return;
-        const sortedTimes = Array.from(timeSet).sort();
+        const sortedTimes = Array.from(timeSet).sort(timeCompare);
         const html = sortedTimes.map(buildTimeBlock).filter(Boolean).join('');
         cont.innerHTML = html || '<div class="text-center text-slate-400 py-6">ไม่มีข้อมูลสำหรับช่องที่เลือก</div>';
     }
@@ -626,7 +643,7 @@
                     </div>
                     <div class="bg-indigo-950/60 p-3.5 rounded-lg border border-indigo-800">
                         <span class="text-[10px] md:text-[11px] text-indigo-300 uppercase tracking-wider block font-semibold">ช่วงเวลาพีค (Peak Window)</span>
-                        <span class="text-xl md:text-2xl font-extrabold text-yellow-300 block mt-1">เวลา ${pbsPeakTime} น.</span>
+                        <span class="text-xl md:text-1.5xl font-extrabold text-yellow-300 block mt-1">เวลา ${pbsPeakTime} น.</span>
                         <span class="text-[10px] md:text-[11px] text-indigo-200 block mt-1">จุดที่ความต้องการรับชมสูงสุด</span>
                     </div>
                     <div class="bg-indigo-950/60 p-3.5 rounded-lg border border-indigo-800">
@@ -824,7 +841,7 @@
             });
         }
 
-        const sortedTimes = Array.from(timeSet).sort();
+        const sortedTimes = Array.from(timeSet).sort(timeCompare);
         if (selectedTime === 'all') {
             document.getElementById('keyTakeaway').innerHTML = generateDetailedAllTimeInsights(sortedTimes);
         } else {
@@ -948,7 +965,7 @@
 
     function updateTrendChart() {
         const ctx = document.getElementById('trendChart').getContext('2d');
-        const sortedTimes = Array.from(timeSet).sort();
+        const sortedTimes = Array.from(timeSet).sort(timeCompare);
         const publishers = (selectedChannels.length === 0) ? [...new Set(allData.map(d => d.publisher))] : selectedChannels.filter(c => allData.some(d => d.publisher === c));
         const lineColors = ['#f26522', '#00a651', '#00a0e3', '#000000', '#d12027', '#8b5cf6', '#ec4899', '#64748b'];
 
@@ -983,7 +1000,7 @@
 
     function updatePlatformTrendChart() {
         const ctx = document.getElementById('platformTrendChart').getContext('2d');
-        const sortedTimes = Array.from(timeSet).sort();
+        const sortedTimes = Array.from(timeSet).sort(timeCompare);
 
         const datasets = [
             { label: 'YouTube', data: sortedTimes.map(t => calculatePlatformTotals(t).yt), borderColor: '#ef4444', backgroundColor: '#ef4444', borderWidth: 2, tension: 0.3, pointRadius: 2 },
