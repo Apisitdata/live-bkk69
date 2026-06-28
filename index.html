@@ -193,7 +193,20 @@
 
 
     // การตั้งค่าช่องที่ทำ Cross Live (ถ้ายอด FB เท่ากัน จะถือว่าเป็นยอดเดียวกันเพื่อไม่ให้นับซ้ำ)
-    const crossLiveGroup = ["Thai PBS", "Thai PBS News", "PPTV", "Thairath Online", "Thairath TV", "THE STANDARD", "Matichon TV"];
+    const crossLiveGroup = ["Thai PBS", "Thai PBS News", "Thai PBS (อนาคตกรุงเทพฯ #เลือกตั้งผู้ว่าฯ กทม. 69)", "Thai PBS News (อนาคตกรุงเทพฯ #เลือกตั้งผู้ว่าฯ กทม. 69)", "PPTV", "Thairath Online", "Thairath TV", "THE STANDARD", "Matichon TV"];
+
+    // ตรวจว่าช่องนี้เป็นช่องที่อาจทำ Cross Live หรือไม่ (เทียบแบบยืดหยุ่น ไม่ต้องตรงชื่อเป๊ะ)
+    // - อยู่ในรายชื่อ crossLiveGroup (เทียบแบบตัดช่องว่างส่วนเกิน) หรือ
+    // - เป็นช่องตระกูล Thai PBS (ชื่อมีคำว่า "Thai PBS" เช่น มีวงเล็บกำกับชื่อรายการต่อท้าย)
+    // หมายเหตุ: การหักลบจะเกิดขึ้นก็ต่อเมื่อ "ยอด Facebook เท่ากันพอดี" เท่านั้น จึงปลอดภัยต่อการนับซ้ำ
+    function _norm(s) { return String(s || '').replace(/\s+/g, ' ').trim(); }
+    function isCrossLiveChannel(name) {
+        const n = _norm(name);
+        if (!n) return false;
+        if (crossLiveGroup.some(g => _norm(g) === n)) return true;
+        if (n.toUpperCase().includes('THAI PBS')) return true;
+        return false;
+    }
 
     function parseValue(val) {
         if (val === undefined || val === null || val === '') return 0;
@@ -425,6 +438,50 @@
         return `<td class="py-2.5 px-2 text-center text-slate-700 border-r border-slate-200 ${bgClass}">${val.toLocaleString()}</td>`;
     }
 
+    // เซลล์ Facebook แบบ Cross Live : รวมหลายช่องที่ยอดเท่ากันเป็นเซลล์เดียว (rowspan) แสดงยอดครั้งเดียว + ป้าย CROSS LIVE
+    function getMergedFbCellHTML(val, rowspan) {
+        return `<td rowspan="${rowspan}" class="py-2.5 px-2 text-center align-middle border-r border-slate-200 bg-rose-50" title="ยอด Facebook ชุดเดียวกัน (Cross Live) จากการถ่ายทอดสัญญาณร่วมหลายเพจ จึงนับรวมเพียงครั้งเดียว">
+                    <div class="text-blue-600 font-extrabold text-[15px] md:text-base leading-tight">${val.toLocaleString()}</div>
+                    <span class="inline-flex items-center mt-1 bg-red-600 text-white text-[8px] md:text-[9px] font-bold px-2 py-0.5 rounded-full tracking-wide">CROSS LIVE</span>
+                </td>`;
+    }
+
+    // วางแผนการ merge คอลัมน์ Facebook : ช่อง Cross Live ที่ยอด FB เท่ากัน (>=2 ช่อง) จะถูกจัดให้อยู่ติดกันและ merge เป็นเซลล์เดียว
+    // คืนค่าเป็นลำดับแถวที่จัดใหม่ พร้อมโหมดการแสดงเซลล์ FB ('merged' = เซลล์รวมแถวแรก, 'skip' = ไม่ต้องวาด td, 'normal' = ปกติ)
+    function buildFbMergePlan(rows, fbOf) {
+        const counts = {};
+        rows.forEach(r => { const fb = fbOf(r); if (isCrossLiveChannel(r.publisher) && fb > 0) counts[fb] = (counts[fb] || 0) + 1; });
+        const used = new Array(rows.length).fill(false);
+        const ordered = [];
+        rows.forEach((r, idx) => {
+            if (used[idx]) return;
+            const fb = fbOf(r);
+            if (isCrossLiveChannel(r.publisher) && fb > 0 && counts[fb] >= 2) {
+                rows.forEach((r2, idx2) => {
+                    if (!used[idx2] && isCrossLiveChannel(r2.publisher) && fbOf(r2) === fb) { used[idx2] = true; ordered.push({ row: r2, fb: fb, cl: true }); }
+                });
+            } else { used[idx] = true; ordered.push({ row: r, fb: fb, cl: false }); }
+        });
+        const plan = [];
+        for (let i = 0; i < ordered.length; i++) {
+            const cur = ordered[i];
+            if (cur.cl) {
+                const prev = ordered[i - 1];
+                const firstOfGroup = !(prev && prev.cl && prev.fb === cur.fb);
+                if (firstOfGroup) {
+                    let span = 0;
+                    for (let j = i; j < ordered.length; j++) { if (ordered[j].cl && ordered[j].fb === cur.fb) span++; else break; }
+                    plan.push({ row: cur.row, fbMode: 'merged', fb: cur.fb, rowspan: span });
+                } else {
+                    plan.push({ row: cur.row, fbMode: 'skip', fb: cur.fb });
+                }
+            } else {
+                plan.push({ row: cur.row, fbMode: 'normal', fb: cur.fb });
+            }
+        }
+        return plan;
+    }
+
     // ===== Helper ระดับ global สำหรับสร้างเซลล์ (ใช้ทั้งตารางหลักและตารางรายช่วงเวลา) =====
     function gPublisherCell(pub) {
         return `<td class="py-2 px-3 flex items-center gap-2 sticky left-0 z-10 bg-white group-hover:bg-slate-100 transition-colors border-r border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">${getLogoHTML(pub)}<span class="font-semibold text-slate-700 truncate w-full pr-1 text-[12px] md:text-sm">${pub}</span></td>`;
@@ -439,21 +496,31 @@
     function buildTimeBlock(time) {
         const rows = allData.filter(d => d.time === time && channelMatch(d.publisher)).map(d => ({...d, tv: {...d.tv}, online: {...d.online}}));
         if (!rows.length) return '';
+        // หักลบ Cross Live: ถ้าช่องในกลุ่มมียอด Facebook (sumFB) เท่ากัน ให้ถือเป็นยอดชุดเดียวกัน นับที่ช่องแรกครั้งเดียว
+        rows.forEach(r => { r.skipFb = false; });
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].skipFb) continue;
+            if (isCrossLiveChannel(rows[i].publisher) && rows[i].sumFB > 0) {
+                for (let j = i + 1; j < rows.length; j++) {
+                    if (isCrossLiveChannel(rows[j].publisher) && rows[j].sumFB === rows[i].sumFB) rows[j].skipFb = true;
+                }
+            }
+        }
         const tvRows = rows.filter(d => (d.tv.yt + d.tv.fb + d.tv.tk + d.tv.x) > 0);
         const onRows = rows.filter(d => (d.online.yt + d.online.fb + d.online.tk + d.online.x) > 0);
         const mx = (arr, fn) => arr.length ? Math.max(...arr.map(fn)) : 0;
-        const tvT = d => d.tv.yt + d.tv.fb + d.tv.tk + d.tv.x;
-        const onT = d => d.online.yt + d.online.fb + d.online.tk + d.online.x;
+        const tvT = d => d.tv.yt + (d.skipFb ? 0 : d.tv.fb) + d.tv.tk + d.tv.x;
+        const onT = d => d.online.yt + (d.skipFb ? 0 : d.online.fb) + d.online.tk + d.online.x;
         let body = '';
         if (tvRows.length) {
             const a = mx(tvRows, d => d.tv.yt), b = mx(tvRows, d => d.tv.fb), c = mx(tvRows, d => d.tv.tk), e = mx(tvRows, d => d.tv.x), t = mx(tvRows, tvT);
             body += `<tr><td colspan="6" class="py-2 px-3 font-bold text-slate-700 bg-blue-50 border-y border-slate-300 text-[12px]">📺 หน้าจอ TV</td></tr>`;
-            tvRows.forEach(r => { body += `<tr class="group hover:bg-slate-100 transition-colors">` + gPublisherCell(r.publisher) + getCellHTML(r.tv.yt, a, 'bg-blue-50/20') + getCellHTML(r.tv.fb, b, 'bg-blue-50/20') + getCellHTML(r.tv.tk, c, 'bg-blue-50/20') + getCellHTML(r.tv.x, e, 'bg-blue-50/20 border-r-slate-300') + gTotalCell(tvT(r), t) + `</tr>`; });
+            buildFbMergePlan(tvRows, d => d.tv.fb).forEach(p => { const r = p.row; const fbCell = p.fbMode === 'merged' ? getMergedFbCellHTML(p.fb, p.rowspan) : (p.fbMode === 'skip' ? '' : getCellHTML(r.tv.fb, b, 'bg-blue-50/20')); body += `<tr class="group hover:bg-slate-100 transition-colors">` + gPublisherCell(r.publisher) + getCellHTML(r.tv.yt, a, 'bg-blue-50/20') + fbCell + getCellHTML(r.tv.tk, c, 'bg-blue-50/20') + getCellHTML(r.tv.x, e, 'bg-blue-50/20 border-r-slate-300') + gTotalCell(tvT(r), t) + `</tr>`; });
         }
         if (onRows.length) {
             const a = mx(onRows, d => d.online.yt), b = mx(onRows, d => d.online.fb), c = mx(onRows, d => d.online.tk), e = mx(onRows, d => d.online.x), t = mx(onRows, onT);
             body += `<tr><td colspan="6" class="py-2 px-3 font-bold text-slate-700 bg-emerald-50 border-y border-slate-300 text-[12px]">🌐 รายการพิเศษทางออนไลน์</td></tr>`;
-            onRows.forEach(r => { body += `<tr class="group hover:bg-slate-100 transition-colors">` + gPublisherCell(r.publisher) + getCellHTML(r.online.yt, a, 'bg-emerald-50/20') + getCellHTML(r.online.fb, b, 'bg-emerald-50/20') + getCellHTML(r.online.tk, c, 'bg-emerald-50/20') + getCellHTML(r.online.x, e, 'bg-emerald-50/20 border-r-slate-300') + gTotalCell(onT(r), t) + `</tr>`; });
+            buildFbMergePlan(onRows, d => d.online.fb).forEach(p => { const r = p.row; const fbCell = p.fbMode === 'merged' ? getMergedFbCellHTML(p.fb, p.rowspan) : (p.fbMode === 'skip' ? '' : getCellHTML(r.online.fb, b, 'bg-emerald-50/20')); body += `<tr class="group hover:bg-slate-100 transition-colors">` + gPublisherCell(r.publisher) + getCellHTML(r.online.yt, a, 'bg-emerald-50/20') + fbCell + getCellHTML(r.online.tk, c, 'bg-emerald-50/20') + getCellHTML(r.online.x, e, 'bg-emerald-50/20 border-r-slate-300') + gTotalCell(onT(r), t) + `</tr>`; });
         }
         const head = `<thead><tr class="bg-slate-100 text-slate-600 border-b-2 border-slate-300"><th class="py-2 px-3 text-left font-bold text-slate-700 sticky left-0 z-10 bg-slate-100 border-r border-slate-300">สื่อ/ช่อง</th><th class="py-2 px-1.5 text-center border-r border-slate-200 text-red-600 font-bold">YouTube</th><th class="py-2 px-1.5 text-center border-r border-slate-200 text-blue-600 font-bold">Facebook</th><th class="py-2 px-1.5 text-center border-r border-slate-200 text-black font-bold">TikTok</th><th class="py-2 px-1.5 text-center border-r border-slate-300 text-slate-800 font-bold">X</th><th class="py-2 px-3 text-center font-bold text-indigo-700 border-l border-slate-300">ยอดชมรวม</th></tr></thead>`;
         return `<div class="rounded-lg border border-slate-200 shadow-sm overflow-hidden"><div class="bg-indigo-50 px-3 py-2 font-bold text-indigo-700 text-sm">🕒 เวลา ${time} น.</div><div class="overflow-x-auto custom-scrollbar"><table class="w-full text-left border-collapse min-w-[480px] text-[12px] md:text-[13px]">${head}<tbody class="divide-y divide-slate-100">${body}</tbody></table></div></div>`;
@@ -522,10 +589,10 @@
             let pub1 = dataAtTime[i].publisher;
             
             // เช็ค Cross Live ด้วยผลรวม Facebook TV+Online
-            if (crossLiveGroup.includes(pub1) && dataAtTime[i].sumFB > 0) {
+            if (isCrossLiveChannel(pub1) && dataAtTime[i].sumFB > 0) {
                 for (let j = i + 1; j < dataAtTime.length; j++) {
                     let pub2 = dataAtTime[j].publisher;
-                    if (crossLiveGroup.includes(pub2) && dataAtTime[j].sumFB === dataAtTime[i].sumFB) {
+                    if (isCrossLiveChannel(pub2) && dataAtTime[j].sumFB === dataAtTime[i].sumFB) {
                         dataAtTime[j].skipFb = true; 
                     }
                 }
@@ -772,10 +839,10 @@
         for (let i = 0; i < filteredData.length; i++) {
             if (filteredData[i].skipFb) continue;
             let pub1 = filteredData[i].publisher;
-            if (crossLiveGroup.includes(pub1) && filteredData[i].sumFB > 0) {
+            if (isCrossLiveChannel(pub1) && filteredData[i].sumFB > 0) {
                 for (let j = i + 1; j < filteredData.length; j++) {
                     let pub2 = filteredData[j].publisher;
-                    if (crossLiveGroup.includes(pub2) && filteredData[j].sumFB === filteredData[i].sumFB) {
+                    if (isCrossLiveChannel(pub2) && filteredData[j].sumFB === filteredData[i].sumFB) {
                         filteredData[j].skipFb = true;
                     }
                 }
@@ -804,8 +871,8 @@
         const mx = (arr, fn) => arr.length ? Math.max(...arr.map(fn)) : 0;
         const maxTvYT = mx(tvRows, d => d.tv.yt), maxTvFB = mx(tvRows, d => d.tv.fb), maxTvTK = mx(tvRows, d => d.tv.tk), maxTvX = mx(tvRows, d => d.tv.x);
         const maxOnYT = mx(onRows, d => d.online.yt), maxOnFB = mx(onRows, d => d.online.fb), maxOnTK = mx(onRows, d => d.online.tk), maxOnX = mx(onRows, d => d.online.x);
-        const tvTotalOf = d => d.tv.yt + d.tv.fb + d.tv.tk + d.tv.x;
-        const onTotalOf = d => d.online.yt + d.online.fb + d.online.tk + d.online.x;
+        const tvTotalOf = d => d.tv.yt + (d.skipFb ? 0 : d.tv.fb) + d.tv.tk + d.tv.x;
+        const onTotalOf = d => d.online.yt + (d.skipFb ? 0 : d.online.fb) + d.online.tk + d.online.x;
         const maxTvTotal = mx(tvRows, tvTotalOf);
         const maxOnTotal = mx(onRows, onTotalOf);
 
@@ -827,13 +894,18 @@
         // บล็อก TV
         if (tvRows.length) {
             tableBody.insertAdjacentHTML('beforeend', sectionDivider('📺 หน้าจอ TV', 'bg-blue-50'));
-            tvRows.forEach(row => {
+            buildFbMergePlan(tvRows, d => d.tv.fb).forEach(p => {
+                const row = p.row;
+                let fbCell = '';
+                if (p.fbMode === 'merged') fbCell = getMergedFbCellHTML(p.fb, p.rowspan);
+                else if (p.fbMode === 'skip') fbCell = '';
+                else fbCell = getCellHTML(row.tv.fb, maxTvFB, 'bg-blue-50/20');
                 const tr = document.createElement('tr');
                 tr.className = "group hover:bg-slate-100 transition-colors";
                 tr.innerHTML =
                     publisherCell(row.publisher) +
                     getCellHTML(row.tv.yt, maxTvYT, 'bg-blue-50/20') +
-                    getCellHTML(row.tv.fb, maxTvFB, 'bg-blue-50/20') +
+                    fbCell +
                     getCellHTML(row.tv.tk, maxTvTK, 'bg-blue-50/20') +
                     getCellHTML(row.tv.x, maxTvX, 'bg-blue-50/20 border-r-slate-300') +
                     totalCellHTML(tvTotalOf(row), maxTvTotal);
@@ -844,13 +916,18 @@
         // บล็อก Online
         if (onRows.length) {
             tableBody.insertAdjacentHTML('beforeend', sectionDivider('🌐 รายการพิเศษทางออนไลน์', 'bg-emerald-50'));
-            onRows.forEach(row => {
+            buildFbMergePlan(onRows, d => d.online.fb).forEach(p => {
+                const row = p.row;
+                let fbCell = '';
+                if (p.fbMode === 'merged') fbCell = getMergedFbCellHTML(p.fb, p.rowspan);
+                else if (p.fbMode === 'skip') fbCell = '';
+                else fbCell = getCellHTML(row.online.fb, maxOnFB, 'bg-emerald-50/20');
                 const tr = document.createElement('tr');
                 tr.className = "group hover:bg-slate-100 transition-colors";
                 tr.innerHTML =
                     publisherCell(row.publisher) +
                     getCellHTML(row.online.yt, maxOnYT, 'bg-emerald-50/20') +
-                    getCellHTML(row.online.fb, maxOnFB, 'bg-emerald-50/20') +
+                    fbCell +
                     getCellHTML(row.online.tk, maxOnTK, 'bg-emerald-50/20') +
                     getCellHTML(row.online.x, maxOnX, 'bg-emerald-50/20 border-r-slate-300') +
                     totalCellHTML(onTotalOf(row), maxOnTotal);
