@@ -122,22 +122,22 @@
                 <table class="w-full text-left border-collapse min-w-[520px] lg:min-w-full text-sm md:text-base">
                     <thead>
                         <!-- หัวตารางแนวตั้ง: แพลตฟอร์มเป็นคอลัมน์ สื่อเป็นแถว -->
-                        <tr class="bg-slate-100 text-slate-600 border-b-2 border-slate-300">
-                            <th class="py-3 px-3 md:px-4 w-[150px] md:w-[22%] text-left align-middle font-bold text-slate-800 text-[14px] md:text-[15px] sticky left-0 z-20 bg-slate-100 border-r border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.03)]">สื่อ/ช่อง</th>
-                            <th class="py-2.5 px-1.5 text-center border-r border-slate-200">
-                                <div class="text-red-600 font-bold text-[14px] md:text-[15px]">YouTube</div><div class="text-[10px] md:text-[11px] font-normal text-slate-400">(Peak Concurrent)</div>
+                        <tr class="bg-slate-100 text-slate-600 border-b-2 border-slate-300 select-none">
+                            <th onclick="setSort('publisher')" class="py-3 px-3 md:px-4 w-[150px] md:w-[22%] text-left align-middle font-bold text-slate-800 text-[14px] md:text-[15px] sticky left-0 z-20 bg-slate-100 border-r border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.03)] cursor-pointer hover:bg-slate-200 transition-colors">สื่อ/ช่อง<span id="si-publisher" class="text-slate-300"> ↕</span></th>
+                            <th onclick="setSort('yt')" class="py-2.5 px-1.5 text-center border-r border-slate-200 cursor-pointer hover:bg-slate-200 transition-colors">
+                                <div class="text-red-600 font-bold text-[14px] md:text-[15px]">YouTube<span id="si-yt" class="text-slate-300"> ↕</span></div><div class="text-[10px] md:text-[11px] font-normal text-slate-400">(Peak Concurrent)</div>
                             </th>
-                            <th class="py-2.5 px-1.5 text-center border-r border-slate-200">
-                                <div class="text-blue-600 font-bold text-[14px] md:text-[15px]">Facebook</div><div class="text-[10px] md:text-[11px] font-normal text-slate-400">(Peak Concurrent)</div>
+                            <th onclick="setSort('fb')" class="py-2.5 px-1.5 text-center border-r border-slate-200 cursor-pointer hover:bg-slate-200 transition-colors">
+                                <div class="text-blue-600 font-bold text-[14px] md:text-[15px]">Facebook<span id="si-fb" class="text-slate-300"> ↕</span></div><div class="text-[10px] md:text-[11px] font-normal text-slate-400">(Peak Concurrent)</div>
                             </th>
-                            <th class="py-2.5 px-1.5 text-center border-r border-slate-200">
-                                <div class="text-black font-bold text-[14px] md:text-[15px]">TikTok</div><div class="text-[10px] md:text-[11px] font-normal text-slate-400">(Peak Concurrent)</div>
+                            <th onclick="setSort('tk')" class="py-2.5 px-1.5 text-center border-r border-slate-200 cursor-pointer hover:bg-slate-200 transition-colors">
+                                <div class="text-black font-bold text-[14px] md:text-[15px]">TikTok<span id="si-tk" class="text-slate-300"> ↕</span></div><div class="text-[10px] md:text-[11px] font-normal text-slate-400">(Peak Concurrent)</div>
                             </th>
-                            <th class="py-2.5 px-1.5 text-center border-r border-slate-300">
-                                <div class="text-slate-800 font-bold text-[14px] md:text-[15px]">X</div><div class="text-[10px] md:text-[11px] font-normal text-slate-400">(Total Views)</div>
+                            <th onclick="setSort('x')" class="py-2.5 px-1.5 text-center border-r border-slate-300 cursor-pointer hover:bg-slate-200 transition-colors">
+                                <div class="text-slate-800 font-bold text-[14px] md:text-[15px]">X<span id="si-x" class="text-slate-300"> ↕</span></div><div class="text-[10px] md:text-[11px] font-normal text-slate-400">(Total Views)</div>
                             </th>
-                            <th class="py-2.5 px-3 text-center align-middle font-bold text-indigo-700 text-[14px] md:text-[15px] border-l border-slate-300">
-                                <div id="totalColHeader">ยอดชมรวมสุทธิ</div>
+                            <th onclick="setSort('total')" class="py-2.5 px-3 text-center align-middle font-bold text-indigo-700 text-[14px] md:text-[15px] border-l border-slate-300 cursor-pointer hover:bg-slate-200 transition-colors">
+                                <div id="totalColHeader">ยอดชมรวมสุทธิ<span id="si-total" class="text-slate-300"> ↕</span></div>
                             </th>
                         </tr>
                     </thead>
@@ -206,6 +206,78 @@
         if (crossLiveGroup.some(g => _norm(g) === n)) return true;
         if (n.toUpperCase().includes('THAI PBS')) return true;
         return false;
+    }
+
+    // ===== สถานะการเรียงลำดับตาราง (คลิกหัวคอลัมน์เพื่อเรียง) เริ่มต้น: ยอดชมรวมมากไปน้อย =====
+    let sortState = { col: 'total', dir: 'desc' };
+
+    // เรียงแถวภายในบล็อก โดยให้ช่องที่ Cross Live (ยอด FB เท่ากัน) ขยับไปคู่กันเสมอ
+    // fields = ออบเจ็กต์ accessor ของคอลัมน์ตัวเลข { yt, fb, tk, x, total }
+    function sortBlockRows(rows, fields) {
+        const dir = sortState.dir === 'asc' ? 1 : -1;
+        const col = sortState.col;
+        // ค่าใช้เรียงของแต่ละแถว
+        const valOf = (r) => {
+            if (col === 'publisher') return 0;
+            const f = fields[col] || fields.total;
+            return f(r) || 0;
+        };
+        // จัดกลุ่ม Cross Live: ช่องในกลุ่มที่มียอด FB เท่ากัน (>=2) ถือเป็นหน่วยเดียวที่ต้องอยู่ติดกัน
+        const fbOf = fields.fb;
+        const counts = {};
+        rows.forEach(r => { const fb = fbOf(r); if (isCrossLiveChannel(r.publisher) && fb > 0) counts[fb] = (counts[fb] || 0) + 1; });
+        const groupKey = (r) => {
+            const fb = fbOf(r);
+            return (isCrossLiveChannel(r.publisher) && fb > 0 && counts[fb] >= 2) ? ('CL:' + fb) : null;
+        };
+        // สร้างหน่วยเรียง (unit) : กลุ่ม Cross Live = 1 หน่วย, ช่องเดี่ยว = 1 หน่วย
+        const units = [];
+        const seen = {};
+        rows.forEach(r => {
+            const gk = groupKey(r);
+            if (gk) {
+                if (!seen[gk]) { seen[gk] = { members: [], key: 0, name: '' }; units.push(seen[gk]); }
+                seen[gk].members.push(r);
+            } else {
+                units.push({ members: [r], key: 0, name: '' });
+            }
+        });
+        // คีย์ของหน่วย: คอลัมน์ตัวเลขใช้ค่าสูงสุดในหน่วย / คอลัมน์ชื่อใช้ชื่อช่องแรก
+        units.forEach(u => {
+            u.name = String(u.members[0].publisher || '');
+            u.key = col === 'publisher' ? 0 : Math.max(...u.members.map(valOf));
+        });
+        units.sort((a, b) => {
+            if (col === 'publisher') return dir * a.name.localeCompare(b.name, 'th');
+            return dir * (a.key - b.key);
+        });
+        // เรียงสมาชิกภายในกลุ่มตามคอลัมน์เดียวกันด้วย (เพื่อให้ดูสอดคล้อง) แต่ยังอยู่ติดกัน
+        const out = [];
+        units.forEach(u => {
+            const members = u.members.slice();
+            if (col !== 'publisher' && members.length > 1) members.sort((a, b) => dir * (valOf(a) - valOf(b)));
+            members.forEach(m => out.push(m));
+        });
+        return out;
+    }
+
+    function updateSortIndicators() {
+        ['publisher', 'yt', 'fb', 'tk', 'x', 'total'].forEach(c => {
+            const el = document.getElementById('si-' + c);
+            if (!el) return;
+            el.textContent = (sortState.col === c) ? (sortState.dir === 'asc' ? ' ▲' : ' ▼') : ' ↕';
+            el.className = (sortState.col === c) ? 'text-indigo-600 font-bold' : 'text-slate-300';
+        });
+    }
+
+    function setSort(col) {
+        if (sortState.col === col) sortState.dir = (sortState.dir === 'asc' ? 'desc' : 'asc');
+        else { sortState.col = col; sortState.dir = (col === 'publisher') ? 'asc' : 'desc'; }
+        updateSortIndicators();
+        const t = (document.getElementById('timeFilter') || {}).value || 'all';
+        updateDashboard(t);
+        const bd = document.getElementById('allTimesBreakdown');
+        if (bd && !bd.classList.contains('hidden')) renderAllTimesBreakdown();
     }
 
     function parseValue(val) {
@@ -423,6 +495,7 @@
         selectedChannels = [];
         bindChannelDropdown();
         updateChannelLabel();
+        updateSortIndicators();
 
         updateDashboard('all');
     }
@@ -515,12 +588,12 @@
         if (tvRows.length) {
             const a = mx(tvRows, d => d.tv.yt), b = mx(tvRows, d => d.tv.fb), c = mx(tvRows, d => d.tv.tk), e = mx(tvRows, d => d.tv.x), t = mx(tvRows, tvT);
             body += `<tr><td colspan="6" class="py-2 px-3 font-bold text-slate-700 bg-blue-50 border-y border-slate-300 text-[12px]">📺 หน้าจอ TV</td></tr>`;
-            buildFbMergePlan(tvRows, d => d.tv.fb).forEach(p => { const r = p.row; const fbCell = p.fbMode === 'merged' ? getMergedFbCellHTML(p.fb, p.rowspan) : (p.fbMode === 'skip' ? '' : getCellHTML(r.tv.fb, b, 'bg-blue-50/20')); body += `<tr class="group hover:bg-slate-100 transition-colors">` + gPublisherCell(r.publisher) + getCellHTML(r.tv.yt, a, 'bg-blue-50/20') + fbCell + getCellHTML(r.tv.tk, c, 'bg-blue-50/20') + getCellHTML(r.tv.x, e, 'bg-blue-50/20 border-r-slate-300') + gTotalCell(tvT(r), t) + `</tr>`; });
+            buildFbMergePlan(sortBlockRows(tvRows, { yt: d => d.tv.yt, fb: d => d.tv.fb, tk: d => d.tv.tk, x: d => d.tv.x, total: tvT }), d => d.tv.fb).forEach(p => { const r = p.row; const fbCell = p.fbMode === 'merged' ? getMergedFbCellHTML(p.fb, p.rowspan) : (p.fbMode === 'skip' ? '' : getCellHTML(r.tv.fb, b, 'bg-blue-50/20')); body += `<tr class="group hover:bg-slate-100 transition-colors">` + gPublisherCell(r.publisher) + getCellHTML(r.tv.yt, a, 'bg-blue-50/20') + fbCell + getCellHTML(r.tv.tk, c, 'bg-blue-50/20') + getCellHTML(r.tv.x, e, 'bg-blue-50/20 border-r-slate-300') + gTotalCell(tvT(r), t) + `</tr>`; });
         }
         if (onRows.length) {
             const a = mx(onRows, d => d.online.yt), b = mx(onRows, d => d.online.fb), c = mx(onRows, d => d.online.tk), e = mx(onRows, d => d.online.x), t = mx(onRows, onT);
             body += `<tr><td colspan="6" class="py-2 px-3 font-bold text-slate-700 bg-emerald-50 border-y border-slate-300 text-[12px]">🌐 รายการพิเศษทางออนไลน์</td></tr>`;
-            buildFbMergePlan(onRows, d => d.online.fb).forEach(p => { const r = p.row; const fbCell = p.fbMode === 'merged' ? getMergedFbCellHTML(p.fb, p.rowspan) : (p.fbMode === 'skip' ? '' : getCellHTML(r.online.fb, b, 'bg-emerald-50/20')); body += `<tr class="group hover:bg-slate-100 transition-colors">` + gPublisherCell(r.publisher) + getCellHTML(r.online.yt, a, 'bg-emerald-50/20') + fbCell + getCellHTML(r.online.tk, c, 'bg-emerald-50/20') + getCellHTML(r.online.x, e, 'bg-emerald-50/20 border-r-slate-300') + gTotalCell(onT(r), t) + `</tr>`; });
+            buildFbMergePlan(sortBlockRows(onRows, { yt: d => d.online.yt, fb: d => d.online.fb, tk: d => d.online.tk, x: d => d.online.x, total: onT }), d => d.online.fb).forEach(p => { const r = p.row; const fbCell = p.fbMode === 'merged' ? getMergedFbCellHTML(p.fb, p.rowspan) : (p.fbMode === 'skip' ? '' : getCellHTML(r.online.fb, b, 'bg-emerald-50/20')); body += `<tr class="group hover:bg-slate-100 transition-colors">` + gPublisherCell(r.publisher) + getCellHTML(r.online.yt, a, 'bg-emerald-50/20') + fbCell + getCellHTML(r.online.tk, c, 'bg-emerald-50/20') + getCellHTML(r.online.x, e, 'bg-emerald-50/20 border-r-slate-300') + gTotalCell(onT(r), t) + `</tr>`; });
         }
         const head = `<thead><tr class="bg-slate-100 text-slate-600 border-b-2 border-slate-300"><th class="py-2.5 px-3 text-left font-bold text-slate-800 text-[14px] md:text-[15px] sticky left-0 z-10 bg-slate-100 border-r border-slate-300">สื่อ/ช่อง</th><th class="py-2.5 px-1.5 text-center border-r border-slate-200 text-red-600 font-bold text-[14px] md:text-[15px]">YouTube</th><th class="py-2.5 px-1.5 text-center border-r border-slate-200 text-blue-600 font-bold text-[14px] md:text-[15px]">Facebook</th><th class="py-2.5 px-1.5 text-center border-r border-slate-200 text-black font-bold text-[14px] md:text-[15px]">TikTok</th><th class="py-2.5 px-1.5 text-center border-r border-slate-300 text-slate-800 font-bold text-[14px] md:text-[15px]">X</th><th class="py-2.5 px-3 text-center font-bold text-indigo-700 text-[14px] md:text-[15px] border-l border-slate-300">ยอดชมรวม</th></tr></thead>`;
         return `<div class="rounded-lg border border-slate-200 shadow-sm overflow-hidden"><div class="bg-indigo-50 px-3 py-2.5 font-bold text-indigo-700 text-[15px] md:text-base">🕒 เวลา ${time} น.</div><div class="overflow-x-auto custom-scrollbar"><table class="w-full text-left border-collapse min-w-[520px] text-sm md:text-[15px]">${head}<tbody class="divide-y divide-slate-100">${body}</tbody></table></div></div>`;
@@ -894,7 +967,8 @@
         // บล็อก TV
         if (tvRows.length) {
             tableBody.insertAdjacentHTML('beforeend', sectionDivider('📺 หน้าจอ TV', 'bg-blue-50'));
-            buildFbMergePlan(tvRows, d => d.tv.fb).forEach(p => {
+            const tvSorted = sortBlockRows(tvRows, { yt: d => d.tv.yt, fb: d => d.tv.fb, tk: d => d.tv.tk, x: d => d.tv.x, total: tvTotalOf });
+            buildFbMergePlan(tvSorted, d => d.tv.fb).forEach(p => {
                 const row = p.row;
                 let fbCell = '';
                 if (p.fbMode === 'merged') fbCell = getMergedFbCellHTML(p.fb, p.rowspan);
@@ -916,7 +990,8 @@
         // บล็อก Online
         if (onRows.length) {
             tableBody.insertAdjacentHTML('beforeend', sectionDivider('🌐 รายการพิเศษทางออนไลน์', 'bg-emerald-50'));
-            buildFbMergePlan(onRows, d => d.online.fb).forEach(p => {
+            const onSorted = sortBlockRows(onRows, { yt: d => d.online.yt, fb: d => d.online.fb, tk: d => d.online.tk, x: d => d.online.x, total: onTotalOf });
+            buildFbMergePlan(onSorted, d => d.online.fb).forEach(p => {
                 const row = p.row;
                 let fbCell = '';
                 if (p.fbMode === 'merged') fbCell = getMergedFbCellHTML(p.fb, p.rowspan);
